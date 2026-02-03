@@ -53,11 +53,11 @@ function getSignalLabel(quality: SignalQuality) {
 }
 
 export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
-    const { results } = useScan()
+    const { results, currentPrimaryPair } = useScan()
 
     // Get price data for charts
     const chartData = useMemo(() => {
-        const primaryResult = results.find((r) => r.symbol === config.primaryPair)
+        const primaryResult = results.find((r) => r.symbol === currentPrimaryPair)
         const secondaryResult = results.find((r) => r.symbol === pair.symbol)
 
         if (!primaryResult || !secondaryResult) {
@@ -96,7 +96,7 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
             spread,
             rollingCorrelations,
         }
-    }, [results, pair.symbol])
+    }, [results, pair.symbol, currentPrimaryPair])
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -109,7 +109,7 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                     <div className="flex items-center gap-3">
                         <h2 className="text-xl font-bold">
                             {pair.symbol.replace("USDT", "")}/USDT
-                            <span className="text-muted-foreground font-normal ml-2">vs {config.primaryPair}</span>
+                            <span className="text-muted-foreground font-normal ml-2">vs {currentPrimaryPair}</span>
                         </h2>
                         <Badge
                             variant="outline"
@@ -237,7 +237,7 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                                     <PriceComparisonChart
                                         primaryPrices={chartData.primaryCloses}
                                         secondaryPrices={chartData.secondaryCloses}
-                                        primaryLabel={config.primaryPair.replace("USDT", "")}
+                                        primaryLabel={currentPrimaryPair.replace("USDT", "")}
                                         secondaryLabel={pair.symbol.replace("USDT", "")}
                                         timestamps={chartData.timestamps}
                                         height={200}

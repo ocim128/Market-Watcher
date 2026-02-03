@@ -87,7 +87,7 @@ const signalQualityOrder: Record<SignalQuality, number> = {
 }
 
 export function PairsTable() {
-    const { analysisResults, isScanning, isAnalyzing, isComplete, progress, lastScanTime } =
+    const { analysisResults, isScanning, isAnalyzing, isComplete, progress, lastScanTime, currentPrimaryPair } =
         useScan()
     const [sortKey, setSortKey] = useState<SortKey>("opportunityScore")
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
@@ -217,7 +217,7 @@ export function PairsTable() {
                                 {(isScanning || isAnalyzing) && <Loader2 className="h-4 w-4 animate-spin" />}
                             </CardTitle>
                             <CardDescription>
-                                {config.primaryPair} vs Top USDT Pairs • Last scan: {formatLastScan()}
+                                {currentPrimaryPair} vs Top USDT Pairs • Last scan: {formatLastScan()}
                                 {isComplete && analysisResults.length > 0 && (
                                     <span>
                                         {" "}
@@ -344,7 +344,7 @@ export function PairsTable() {
                                             <TableCell className="font-medium">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono">{pair.symbol.replace("USDT", "")}</span>
-                                                    <span className="text-xs text-muted-foreground">vs ETH</span>
+                                                    <span className="text-xs text-muted-foreground">vs {currentPrimaryPair.replace("USDT", "")}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -393,20 +393,20 @@ export function PairsTable() {
                                                     <div className="w-16 bg-secondary rounded-full h-2">
                                                         <div
                                                             className={`h-2 rounded-full ${pair.opportunityScore >= 70
-                                                                    ? "bg-emerald-500"
-                                                                    : pair.opportunityScore >= 40
-                                                                        ? "bg-yellow-500"
-                                                                        : "bg-muted-foreground"
+                                                                ? "bg-emerald-500"
+                                                                : pair.opportunityScore >= 40
+                                                                    ? "bg-yellow-500"
+                                                                    : "bg-muted-foreground"
                                                                 }`}
                                                             style={{ width: `${pair.opportunityScore}%` }}
                                                         />
                                                     </div>
                                                     <span
                                                         className={`font-mono text-sm ${pair.opportunityScore >= 70
-                                                                ? "text-emerald-500"
-                                                                : pair.opportunityScore >= 40
-                                                                    ? "text-yellow-500"
-                                                                    : "text-muted-foreground"
+                                                            ? "text-emerald-500"
+                                                            : pair.opportunityScore >= 40
+                                                                ? "text-yellow-500"
+                                                                : "text-muted-foreground"
                                                             }`}
                                                     >
                                                         {pair.opportunityScore}%
@@ -466,7 +466,7 @@ export function PairsTable() {
                             </div>
                             <h3 className="font-semibold text-lg mb-1">Ready to Scan</h3>
                             <p className="text-muted-foreground text-sm max-w-sm">
-                                Click "Scan Pairs" to analyze correlations between {config.primaryPair} and the
+                                Click "Scan Pairs" to analyze correlations between {currentPrimaryPair} and the
                                 top {config.topPairsLimit} USDT pairs on Binance.
                             </p>
                         </div>

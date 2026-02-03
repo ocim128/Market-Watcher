@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useScan } from "@/components/scan-context"
 import { useAutoRefresh } from "@/hooks/use-auto-refresh"
 import { SettingsPanel } from "./settings-panel"
-import { config, AVAILABLE_INTERVALS, getIntervalUseCase, type IntervalType } from "@/config"
+import { config, AVAILABLE_INTERVALS, getIntervalUseCase, type IntervalType, type PrimaryPairType } from "@/config"
 
 export function Header() {
     const { theme, setTheme } = useTheme()
@@ -19,6 +19,7 @@ export function Header() {
     const [scanSettings, setScanSettings] = useState({
         interval: config.interval,
         totalBars: config.totalBars,
+        primaryPair: config.primaryPair,
     })
 
     const handleScan = useCallback(async () => {
@@ -27,6 +28,7 @@ export function Header() {
                 limit: config.topPairsLimit,
                 interval: scanSettings.interval,
                 totalBars: scanSettings.totalBars,
+                primaryPair: scanSettings.primaryPair,
             })
         } catch (error) {
             console.error("Scan failed:", error)
@@ -34,7 +36,7 @@ export function Header() {
     }, [scan, scanSettings])
 
     const handleScanSettingsChange = useCallback(
-        (newSettings: { interval: IntervalType; totalBars: number }) => {
+        (newSettings: { interval: IntervalType; totalBars: number; primaryPair: string }) => {
             setScanSettings(newSettings)
         },
         []
@@ -82,7 +84,7 @@ export function Header() {
                         <div className="flex items-center gap-1 text-foreground">
                             <Timer className="h-3 w-3" />
                             <span className="font-mono">
-                                {getIntervalLabel()} · {scanSettings.totalBars} bars
+                                {scanSettings.primaryPair.replace("USDT", "")} · {getIntervalLabel()} · {scanSettings.totalBars} bars
                             </span>
                         </div>
                         <span className="text-muted-foreground">{useCase}</span>

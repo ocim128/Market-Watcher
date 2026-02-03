@@ -19,6 +19,21 @@ export const PRESET_BARS = [
     { value: 2000, label: "2000" },
 ] as const
 
+export const AVAILABLE_PRIMARY_PAIRS = [
+    { value: "BTCUSDT", label: "BTC/USDT", description: "Bitcoin - Market leader" },
+    { value: "ETHUSDT", label: "ETH/USDT", description: "Ethereum - DeFi standard" },
+    { value: "BNBUSDT", label: "BNB/USDT", description: "Binance Coin" },
+    { value: "SOLUSDT", label: "SOL/USDT", description: "Solana" },
+    { value: "XRPUSDT", label: "XRP/USDT", description: "Ripple" },
+    { value: "ADAUSDT", label: "ADA/USDT", description: "Cardano" },
+    { value: "AVAXUSDT", label: "AVAX/USDT", description: "Avalanche" },
+    { value: "DOGEUSDT", label: "DOGE/USDT", description: "Dogecoin" },
+    { value: "DOTUSDT", label: "DOT/USDT", description: "Polkadot" },
+    { value: "MATICUSDT", label: "MATIC/USDT", description: "Polygon" },
+] as const
+
+export type PrimaryPairType = (typeof AVAILABLE_PRIMARY_PAIRS)[number]["value"]
+
 export type IntervalType = (typeof AVAILABLE_INTERVALS)[number]["value"]
 
 export const config = {

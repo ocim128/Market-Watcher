@@ -11,6 +11,7 @@ import {
     Clock,
     X,
     BarChart3,
+    GitCompare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +21,7 @@ import {
     config,
     AVAILABLE_INTERVALS,
     PRESET_BARS,
+    AVAILABLE_PRIMARY_PAIRS,
     getTimeDescription,
     getIntervalUseCase,
     type IntervalType,
@@ -31,8 +33,9 @@ interface SettingsPanelProps {
     scanSettings: {
         interval: IntervalType
         totalBars: number
+        primaryPair: string
     }
-    onScanSettingsChange: (settings: { interval: IntervalType; totalBars: number }) => void
+    onScanSettingsChange: (settings: { interval: IntervalType; totalBars: number; primaryPair: string }) => void
 }
 
 export function SettingsPanel({
@@ -109,6 +112,44 @@ export function SettingsPanel({
                             Scan Parameters
                         </h4>
 
+                        {/* Primary Pair Selector */}
+                        <div>
+                            <label className="text-xs text-muted-foreground block mb-2">
+                                <GitCompare className="h-3 w-3 inline mr-1" />
+                                Primary Pair (Reference)
+                            </label>
+                            <div className="space-y-1">
+                                {AVAILABLE_PRIMARY_PAIRS.map((pair) => (
+                                    <button
+                                        key={pair.value}
+                                        onClick={() =>
+                                            onScanSettingsChange({
+                                                ...scanSettings,
+                                                primaryPair: pair.value,
+                                            })
+                                        }
+                                        className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${scanSettings.primaryPair === pair.value
+                                            ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                                            : "bg-secondary/50 hover:bg-secondary"
+                                            }`}
+                                    >
+                                        <span className="font-medium font-mono">{pair.label}</span>
+                                        <span
+                                            className={`text-xs ${scanSettings.primaryPair === pair.value
+                                                ? "text-white/80"
+                                                : "text-muted-foreground"
+                                                }`}
+                                        >
+                                            {pair.description}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                All pairs will be analyzed against the selected primary pair
+                            </p>
+                        </div>
+
                         {/* Timeframe */}
                         <div>
                             <label className="text-xs text-muted-foreground block mb-2">Timeframe</label>
@@ -123,15 +164,15 @@ export function SettingsPanel({
                                             })
                                         }
                                         className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${scanSettings.interval === interval.value
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-secondary/50 hover:bg-secondary"
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-secondary/50 hover:bg-secondary"
                                             }`}
                                     >
                                         <span className="font-medium">{interval.label}</span>
                                         <span
                                             className={`text-xs ${scanSettings.interval === interval.value
-                                                    ? "text-primary-foreground/80"
-                                                    : "text-muted-foreground"
+                                                ? "text-primary-foreground/80"
+                                                : "text-muted-foreground"
                                                 }`}
                                         >
                                             {interval.useCase}
@@ -152,8 +193,8 @@ export function SettingsPanel({
                                         key={barOption.value}
                                         onClick={() => handlePresetBars(barOption.value)}
                                         className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${scanSettings.totalBars === barOption.value
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-secondary hover:bg-secondary/80"
+                                            ? "bg-primary text-primary-foreground"
+                                            : "bg-secondary hover:bg-secondary/80"
                                             }`}
                                     >
                                         {barOption.label}
@@ -308,7 +349,7 @@ export function SettingsPanel({
                         <h4 className="text-sm font-medium text-foreground">Current Config</h4>
                         <div className="grid grid-cols-2 gap-1">
                             <span>Primary Pair:</span>
-                            <span className="font-mono">{config.primaryPair}</span>
+                            <span className="font-mono text-primary">{scanSettings.primaryPair}</span>
                             <span>Top Pairs:</span>
                             <span className="font-mono">{config.topPairsLimit}</span>
                         </div>

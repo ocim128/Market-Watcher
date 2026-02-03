@@ -74,7 +74,7 @@ function calculateCombinedStats(results: BacktestResult[]): CombinedStats {
 }
 
 export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
-    const { results, analysisResults } = useScan()
+    const { results, analysisResults, currentPrimaryPair } = useScan()
     const [btConfig, setBtConfig] = useState<BacktestConfig>(DEFAULT_BACKTEST_CONFIG)
     const [backtestResults, setBacktestResults] = useState<BacktestResult[]>([])
     const [isRunning, setIsRunning] = useState(false)
@@ -82,17 +82,17 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
 
     // Get primary pair closes
     const primaryCloses = useMemo(() => {
-        const primary = results.find(r => r.symbol === config.primaryPair)
+        const primary = results.find(r => r.symbol === currentPrimaryPair)
         return primary?.closePrices || []
-    }, [results])
+    }, [results, currentPrimaryPair])
 
     // Get pairs that meet correlation threshold
     const eligiblePairs = useMemo(() => {
         return analysisResults.filter(r =>
-            r.symbol !== config.primaryPair &&
+            r.symbol !== currentPrimaryPair &&
             r.correlation >= btConfig.minCorrelation
         )
-    }, [analysisResults, btConfig.minCorrelation])
+    }, [analysisResults, btConfig.minCorrelation, currentPrimaryPair])
 
     const handleRunAll = useCallback(async () => {
         if (primaryCloses.length === 0) return
@@ -112,7 +112,7 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
                     primaryCloses,
                     pairData.closePrices,
                     pair.symbol,
-                    config.primaryPair,
+                    currentPrimaryPair,
                     btConfig
                 )
                 allResults.push(result)
@@ -128,7 +128,7 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
 
         setBacktestResults(allResults)
         setIsRunning(false)
-    }, [primaryCloses, eligiblePairs, results, btConfig])
+    }, [primaryCloses, eligiblePairs, results, btConfig, currentPrimaryPair])
 
     const handleReset = () => {
         setBacktestResults([])
@@ -364,7 +364,7 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
                                             <td className="py-2 px-2 text-muted-foreground">{idx + 1}</td>
                                             <td className="py-2 px-2 font-medium">
                                                 {result.symbol.replace("USDT", "")}
-                                                <span className="text-muted-foreground text-xs ml-1">vs {config.primaryPair.replace("USDT", "")}</span>
+                                                <span className="text-muted-foreground text-xs ml-1">vs {currentPrimaryPair.replace("USDT", "")}</span>
                                             </td>
                                             <td className="py-2 px-2 text-right font-mono">{result.summary.totalTrades}</td>
                                             <td className="py-2 px-2 text-right">

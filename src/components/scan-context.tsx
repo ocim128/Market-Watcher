@@ -18,6 +18,7 @@ interface ScanContextValue {
     progress: ScanProgress
     results: ScanResult[]
     analysisResults: PairAnalysisResult[]
+    currentPrimaryPair: string
     isScanning: boolean
     isAnalyzing: boolean
     isComplete: boolean
@@ -32,6 +33,7 @@ interface ScanOptions {
     limit?: number
     interval?: string
     totalBars?: number
+    primaryPair?: string
     concurrency?: number
     includePrimary?: boolean
     autoAnalyze?: boolean
@@ -51,6 +53,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     const [analysisResults, setAnalysisResults] = useState<PairAnalysisResult[]>([])
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [lastScanTime, setLastScanTime] = useState<Date | null>(null)
+    const [currentPrimaryPair, setCurrentPrimaryPair] = useState<string>(config.primaryPair)
 
     // Analyze all pairs
     const analyze = useCallback(() => {
@@ -104,6 +107,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
                 limit = config.topPairsLimit,
                 interval = config.interval,
                 totalBars = config.totalBars,
+                primaryPair = config.primaryPair,
                 concurrency = 5,
                 includePrimary = true,
                 autoAnalyze = true,
@@ -117,18 +121,19 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             })
             setResults([])
             setAnalysisResults([])
+            setCurrentPrimaryPair(primaryPair)
 
             try {
                 // Step 1: Get top pairs
                 let pairs = await getTopUsdtPairs(limit)
-                pairs = pairs.filter((p) => p !== config.primaryPair)
+                pairs = pairs.filter((p) => p !== primaryPair)
 
-                const allSymbols = includePrimary ? [config.primaryPair, ...pairs] : pairs
+                const allSymbols = includePrimary ? [primaryPair, ...pairs] : pairs
 
                 setProgress({
                     current: 0,
                     total: allSymbols.length,
-                    currentSymbol: config.primaryPair,
+                    currentSymbol: primaryPair,
                     status: "scanning",
                 })
 
@@ -195,7 +200,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
                 if (autoAnalyze && scanResults.length > 0) {
                     // Run analysis after a small delay to let state settle
                     setTimeout(() => {
-                        analyzeResults(scanResults)
+                        analyzeResults(scanResults, primaryPair)
                     }, 100)
                 }
 
@@ -214,11 +219,11 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     )
 
     // Helper function to analyze results directly
-    const analyzeResults = useCallback((scanResults: ScanResult[]) => {
+    const analyzeResults = useCallback((scanResults: ScanResult[], primaryPair: string = config.primaryPair) => {
         setIsAnalyzing(true)
 
         try {
-            const primaryResult = scanResults.find((r) => r.symbol === config.primaryPair)
+            const primaryResult = scanResults.find((r) => r.symbol === primaryPair)
             if (!primaryResult || primaryResult.closePrices.length === 0) {
                 console.warn("Primary pair data not found")
                 setIsAnalyzing(false)
@@ -226,7 +231,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             }
 
             const primaryCloses = primaryResult.closePrices
-            const otherPairs = scanResults.filter((r) => r.symbol !== config.primaryPair)
+            const otherPairs = scanResults.filter((r) => r.symbol !== primaryPair)
 
             const analyzed: PairAnalysisResult[] = []
             for (const pair of otherPairs) {
@@ -235,7 +240,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
                         primaryCloses,
                         pair.closePrices,
                         pair.symbol,
-                        config.primaryPair
+                        primaryPair
                     )
                     analyzed.push(result)
                 }
@@ -266,6 +271,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             progress,
             results,
             analysisResults,
+            currentPrimaryPair,
             isScanning: progress.status === "scanning",
             isAnalyzing,
             isComplete: progress.status === "complete",
@@ -275,7 +281,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             reset,
             lastScanTime,
         }),
-        [progress, results, analysisResults, isAnalyzing, scan, analyze, reset, lastScanTime]
+        [progress, results, analysisResults, currentPrimaryPair, isAnalyzing, scan, analyze, reset, lastScanTime]
     )
 
     return <ScanContext.Provider value={value}>{children}</ScanContext.Provider>

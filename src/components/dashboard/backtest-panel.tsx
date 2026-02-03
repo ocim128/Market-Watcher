@@ -38,12 +38,12 @@ function getExitBadge(exitReason: Trade["exitReason"]) {
 }
 
 export function BacktestPanel({ symbol, onClose }: BacktestPanelProps) {
-    const { results } = useScan()
+    const { results, currentPrimaryPair } = useScan()
     const { config: btConfig, setConfig, result, isRunning, run, reset } = useBacktest()
 
     // Get price data
     const priceData = useMemo(() => {
-        const primaryResult = results.find((r) => r.symbol === config.primaryPair)
+        const primaryResult = results.find((r) => r.symbol === currentPrimaryPair)
         const secondaryResult = results.find((r) => r.symbol === symbol)
 
         if (!primaryResult || !secondaryResult) return null
@@ -52,11 +52,11 @@ export function BacktestPanel({ symbol, onClose }: BacktestPanelProps) {
             primaryCloses: primaryResult.closePrices,
             secondaryCloses: secondaryResult.closePrices,
         }
-    }, [results, symbol])
+    }, [results, symbol, currentPrimaryPair])
 
     const handleRun = () => {
         if (!priceData) return
-        run(priceData.primaryCloses, priceData.secondaryCloses, symbol, config.primaryPair)
+        run(priceData.primaryCloses, priceData.secondaryCloses, symbol, currentPrimaryPair)
     }
 
     return (
@@ -255,12 +255,12 @@ export function BacktestPanel({ symbol, onClose }: BacktestPanelProps) {
                                             <td className="py-2 px-2">
                                                 {trade.direction === "long_primary" ? (
                                                     <div className="flex flex-col text-xs">
-                                                        <span className="text-emerald-400">LONG {config.primaryPair.replace("USDT", "")}</span>
+                                                        <span className="text-emerald-400">LONG {currentPrimaryPair.replace("USDT", "")}</span>
                                                         <span className="text-red-400">SHORT {symbol.replace("USDT", "")}</span>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col text-xs">
-                                                        <span className="text-red-400">SHORT {config.primaryPair.replace("USDT", "")}</span>
+                                                        <span className="text-red-400">SHORT {currentPrimaryPair.replace("USDT", "")}</span>
                                                         <span className="text-emerald-400">LONG {symbol.replace("USDT", "")}</span>
                                                     </div>
                                                 )}
