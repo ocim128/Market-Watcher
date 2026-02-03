@@ -34,6 +34,7 @@ export const AVAILABLE_PRIMARY_PAIRS = [
 
 export type PrimaryPairType = (typeof AVAILABLE_PRIMARY_PAIRS)[number]["value"]
 
+// Define IntervalType from AVAILABLE_INTERVALS
 export type IntervalType = (typeof AVAILABLE_INTERVALS)[number]["value"]
 
 export const config = {
@@ -86,6 +87,16 @@ export const config = {
 }
 
 export type Config = typeof config
+
+/**
+ * Get array of interval values for confluence analysis
+ */
+export function getConfluenceIntervals(): IntervalType[] {
+    return ["5m", "15m", "1h"]
+}
+
+// Re-export IntervalType from types for external use (they should match)
+export type { IntervalType as TypesIntervalType } from "@/types"
 
 /**
  * Calculate approximate time coverage for a given interval and bar count

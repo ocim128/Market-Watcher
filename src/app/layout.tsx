@@ -19,9 +19,13 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>
+            <body className={`${inter.className} antialiased relative`}>
                 <Providers>
-                    <div className="min-h-screen bg-background">
+                    <div className="fixed inset-0 z-[-1] bg-background">
+                        <div className="absolute top-0 left-0 right-0 h-[500px] bg-purple-500/10 blur-[120px] rounded-full mix-blend-screen pointer-events-none" />
+                        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] rounded-full mix-blend-screen pointer-events-none" />
+                    </div>
+                    <div className="min-h-screen">
                         {children}
                     </div>
                 </Providers>

@@ -1,17 +1,18 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Activity, RefreshCw, Moon, Sun, Loader2, Settings, Clock, Timer } from "lucide-react"
+import { Activity, Moon, Sun, Loader2, Settings, Clock, LayoutDashboard, Zap } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+
 import { useScan } from "@/components/scan-context"
 import { useAutoRefresh } from "@/hooks/use-auto-refresh"
 import { SettingsPanel } from "./settings-panel"
-import { config, AVAILABLE_INTERVALS, getIntervalUseCase, type IntervalType, type PrimaryPairType } from "@/config"
+import { config, AVAILABLE_INTERVALS, getIntervalUseCase, type IntervalType } from "@/config"
 
 export function Header() {
     const { theme, setTheme } = useTheme()
-    const { scan, progress, isScanning, lastScanTime } = useScan()
+    const { scan, isScanning, lastScanTime } = useScan()
     const { isAutoRefreshEnabled, formatNextRefresh, nextRefreshIn } = useAutoRefresh()
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -62,83 +63,96 @@ export function Header() {
 
     return (
         <>
-            <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-                        <Activity className="h-6 w-6 text-white" />
+            <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 mb-8 rounded-b-xl shadow-sm">
+                <div className="container flex h-16 items-center justify-between px-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                            <LayoutDashboard className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                                Market Watcher
+                            </h1>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1">
+                                    <Activity className="h-3 w-3" />
+                                    Live Monitor
+                                </span>
+                                {lastScanTime && (
+                                    <span className="text-[10px] text-muted-foreground border-l border-border pl-2">
+                                        Last: {formatLastScan()}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight gradient-text">Market Watcher</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Pair Trading Opportunity Dashboard
-                            {lastScanTime && (
-                                <span className="ml-2 text-xs">• Last scan: {formatLastScan()}</span>
+
+                    <div className="flex items-center gap-2 md:gap-4">
+                        {/* System Status Indicators - Hidden on mobile */}
+                        <div className="hidden md:flex items-center gap-3 mr-2">
+                            {/* Active Status */}
+                            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span className="text-xs font-medium text-emerald-500">System Active</span>
+                            </div>
+
+                            {/* Config Summary */}
+                            <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <span className="text-foreground">{scanSettings.primaryPair.replace("USDT", "")}</span>
+                                    <span className="text-muted-foreground">·</span>
+                                    <span className="text-foreground">{getIntervalLabel()}</span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{useCase}</span>
+                            </div>
+                        </div>
+
+                        <div className="h-8 w-[1px] bg-border mx-1 hidden md:block" />
+
+                        {/* Controls */}
+                        <div className="flex items-center gap-2">
+                            {isAutoRefreshEnabled && nextRefreshIn !== null && !isScanning && (
+                                <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground mr-2 bg-secondary/50 px-2 py-1 rounded-md">
+                                    <Clock className="h-3 w-3" />
+                                    <span className="font-mono">{formatNextRefresh()}</span>
+                                </div>
                             )}
-                        </p>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className={`gap-2 ${isScanning ? "opacity-80" : ""}`}
+                                onClick={handleScan}
+                                disabled={isScanning}
+                            >
+                                {isScanning ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Zap className="h-3.5 w-3.5" />
+                                )}
+                                <span className="hidden sm:inline">{isScanning ? "Scanning..." : "Scan"}</span>
+                            </Button>
+
+                            <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="hover:bg-primary/10 hover:text-primary">
+                                <Settings className="h-4 w-4" />
+                                <span className="sr-only">Settings</span>
+                            </Button>
+
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                                className="hover:bg-primary/10 hover:text-primary"
+                            >
+                                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                                <span className="sr-only">Toggle theme</span>
+                            </Button>
+                        </div>
                     </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {/* Current settings indicator */}
-                    <div className="hidden sm:flex flex-col items-end text-xs bg-secondary/50 px-3 py-1.5 rounded">
-                        <div className="flex items-center gap-1 text-foreground">
-                            <Timer className="h-3 w-3" />
-                            <span className="font-mono">
-                                {scanSettings.primaryPair.replace("USDT", "")} · {getIntervalLabel()} · {scanSettings.totalBars} bars
-                            </span>
-                        </div>
-                        <span className="text-muted-foreground">{useCase}</span>
-                    </div>
-
-                    {/* Auto-refresh indicator */}
-                    {isAutoRefreshEnabled && nextRefreshIn !== null && !isScanning && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span className="font-mono">{formatNextRefresh()}</span>
-                        </div>
-                    )}
-
-                    {/* Scanning progress */}
-                    {isScanning && (
-                        <div className="text-sm text-muted-foreground">
-                            <span className="font-mono">
-                                {progress.current}/{progress.total}
-                            </span>
-                            {progress.currentSymbol && (
-                                <span className="ml-2 text-xs hidden sm:inline">{progress.currentSymbol}</span>
-                            )}
-                        </div>
-                    )}
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={handleScan}
-                        disabled={isScanning}
-                    >
-                        {isScanning ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <RefreshCw className="h-4 w-4" />
-                        )}
-                        {isScanning ? "Scanning..." : "Scan Pairs"}
-                    </Button>
-
-                    <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)}>
-                        <Settings className="h-4 w-4" />
-                        <span className="sr-only">Settings</span>
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    >
-                        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                        <span className="sr-only">Toggle theme</span>
-                    </Button>
                 </div>
             </header>
 

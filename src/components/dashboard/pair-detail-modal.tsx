@@ -10,7 +10,6 @@ import { PriceComparisonChart } from "@/components/charts/price-comparison-chart
 import { BacktestPanel } from "@/components/dashboard/backtest-panel"
 import { useScan } from "@/components/scan-context"
 import { calculateSpread, pearsonCorrelation, calculateReturns } from "@/lib/analysis"
-import { config } from "@/config"
 import type { PairAnalysisResult, SignalQuality } from "@/types"
 
 interface PairDetailModalProps {

@@ -1,5 +1,6 @@
 import { config } from "@/config"
 import type { BinanceKline, Binance24hrTicker, BinanceExchangeInfo } from "@/types"
+import { resolveFetchInterval, resampleKlines, calculateRequiredBars } from "./resample"
 
 const BINANCE_BASE_URL = config.binanceBaseUrl
 
@@ -148,6 +149,60 @@ export async function fetchKlinesPaged(
     // Reverse chunks (we fetched backwards in time) and flatten
     chunks.reverse()
     return chunks.flat()
+}
+
+/**
+ * Smart fetch with automatic resampling for custom intervals
+ * 
+ * For native Binance intervals (1m, 3m, 5m, etc.), fetches directly.
+ * For custom intervals (2m, 7m, 10m, etc.), fetches 1m and resamples.
+ * 
+ * @param symbol - Trading pair symbol
+ * @param interval - Target interval (native like "5m" or custom like "7m")
+ * @param totalBars - Number of target bars to return
+ * @param batchSize - Bars per request
+ * @param delayMs - Delay between requests
+ */
+export async function fetchKlinesSmart(
+    symbol: string,
+    interval: string,
+    totalBars: number = 200,
+    batchSize: number = 1000,
+    delayMs: number = 100,
+    onProgress?: (fetched: number, total: number) => void
+): Promise<BinanceKline[]> {
+    const { sourceInterval, needsResample } = resolveFetchInterval(interval)
+    
+    if (!needsResample) {
+        // Native interval - fetch directly
+        return fetchKlinesPaged(symbol, interval, totalBars, batchSize, delayMs, onProgress)
+    }
+    
+    // Custom interval - need to fetch more source bars and resample
+    const requiredBars = calculateRequiredBars(totalBars, interval, sourceInterval)
+    
+    console.log(`[Resample] Fetching ${requiredBars} ${sourceInterval} bars to create ${totalBars} ${interval} bars`)
+    
+    const sourceKlines = await fetchKlinesPaged(
+        symbol,
+        sourceInterval,
+        requiredBars,
+        batchSize,
+        delayMs,
+        onProgress
+    )
+    
+    if (sourceKlines.length === 0) {
+        return []
+    }
+    
+    // Resample to target interval
+    const resampled = resampleKlines(sourceKlines, interval)
+    
+    console.log(`[Resample] ${symbol} ${interval}: ${sourceKlines.length} ${sourceInterval} -> ${resampled.length} ${interval}`)
+    
+    // Return exactly the requested number of bars (most recent)
+    return resampled.slice(-totalBars)
 }
 
 /**

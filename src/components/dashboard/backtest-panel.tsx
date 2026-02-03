@@ -7,12 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { useScan } from "@/components/scan-context"
 import { useBacktest } from "@/hooks/use-backtest"
-import { config } from "@/config"
-import type { BacktestResult, Trade } from "@/types/backtest-types"
+import type { Trade } from "@/types/backtest-types"
 
 interface BacktestPanelProps {
     symbol: string
-    onClose?: () => void
 }
 
 function formatPercent(value: number, decimals: number = 2): string {
@@ -37,7 +35,7 @@ function getExitBadge(exitReason: Trade["exitReason"]) {
     }
 }
 
-export function BacktestPanel({ symbol, onClose }: BacktestPanelProps) {
+export function BacktestPanel({ symbol }: BacktestPanelProps) {
     const { results, currentPrimaryPair } = useScan()
     const { config: btConfig, setConfig, result, isRunning, run, reset } = useBacktest()
 

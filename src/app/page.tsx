@@ -2,6 +2,8 @@ import { Header } from "@/components/dashboard/header"
 import { OpportunitySummary } from "@/components/dashboard/opportunity-summary"
 import { PairsTable } from "@/components/dashboard/pairs-table"
 import { BacktestAllPanel } from "@/components/dashboard/backtest-all-panel"
+import { MultiTimeframePanel } from "@/components/dashboard/multi-timeframe-panel"
+import { HistoryPanel } from "@/components/dashboard/history-panel"
 
 export default function Home() {
     return (
@@ -10,6 +12,8 @@ export default function Home() {
             <OpportunitySummary />
             <BacktestAllPanel />
             <PairsTable />
+            <MultiTimeframePanel />
+            <HistoryPanel />
         </main>
     )
 }

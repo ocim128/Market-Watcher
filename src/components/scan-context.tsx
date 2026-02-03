@@ -6,6 +6,7 @@ import { config } from "@/config"
 import { getTopUsdtPairs, fetchKlinesPaged, extractClosePrices } from "@/lib/binance"
 import { analyzePair } from "@/lib/analysis"
 import { queryKeys } from "@/hooks/use-binance-data"
+import { saveSnapshot } from "@/lib/history/tracking"
 import type { ScanProgress, BinanceKline, PairAnalysisResult } from "@/types"
 
 export interface ScanResult {
@@ -55,16 +56,12 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     const [lastScanTime, setLastScanTime] = useState<Date | null>(null)
     const [currentPrimaryPair, setCurrentPrimaryPair] = useState<string>(config.primaryPair)
 
-    // Analyze all pairs
-    const analyze = useCallback(() => {
-        if (results.length === 0) return
-
+    // Helper function to analyze results directly
+    const analyzeResults = useCallback((scanResults: ScanResult[], primaryPair: string = config.primaryPair) => {
         setIsAnalyzing(true)
-        setProgress((prev) => ({ ...prev, currentSymbol: "Analyzing pairs..." }))
 
         try {
-            // Find primary pair data
-            const primaryResult = results.find((r) => r.symbol === config.primaryPair)
+            const primaryResult = scanResults.find((r) => r.symbol === primaryPair)
             if (!primaryResult || primaryResult.closePrices.length === 0) {
                 console.warn("Primary pair data not found")
                 setIsAnalyzing(false)
@@ -72,34 +69,29 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             }
 
             const primaryCloses = primaryResult.closePrices
+            const otherPairs = scanResults.filter((r) => r.symbol !== primaryPair)
 
-            // Analyze each pair against the primary
             const analyzed: PairAnalysisResult[] = []
-            const otherPairs = results.filter((r) => r.symbol !== config.primaryPair)
-
             for (const pair of otherPairs) {
                 if (pair.closePrices.length > 0) {
                     const result = analyzePair(
                         primaryCloses,
                         pair.closePrices,
                         pair.symbol,
-                        config.primaryPair
+                        primaryPair
                     )
                     analyzed.push(result)
                 }
             }
 
-            // Sort by opportunity score (descending)
             analyzed.sort((a, b) => b.opportunityScore - a.opportunityScore)
-
             setAnalysisResults(analyzed)
         } catch (error) {
             console.error("Analysis failed:", error)
         } finally {
             setIsAnalyzing(false)
-            setProgress((prev) => ({ ...prev, currentSymbol: "" }))
         }
-    }, [results])
+    }, [])
 
     const scan = useCallback(
         async (options: ScanOptions = {}) => {
@@ -201,6 +193,24 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
                     // Run analysis after a small delay to let state settle
                     setTimeout(() => {
                         analyzeResults(scanResults, primaryPair)
+                        
+                        // Save to history after analysis completes
+                        setTimeout(() => {
+                            const currentResults = scanResults.filter(r => r.symbol !== primaryPair).map(r => {
+                                const primaryResult = scanResults.find(s => s.symbol === primaryPair)
+                                if (!primaryResult) return null
+                                return analyzePair(
+                                    primaryResult.closePrices,
+                                    r.closePrices,
+                                    r.symbol,
+                                    primaryPair
+                                )
+                            }).filter(Boolean) as PairAnalysisResult[]
+                            
+                            if (currentResults.length > 0) {
+                                saveSnapshot(currentResults, primaryPair, interval)
+                            }
+                        }, 500)
                     }, 100)
                 }
 
@@ -215,45 +225,13 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
                 throw error
             }
         },
-        [queryClient]
+        [queryClient, analyzeResults]
     )
 
-    // Helper function to analyze results directly
-    const analyzeResults = useCallback((scanResults: ScanResult[], primaryPair: string = config.primaryPair) => {
-        setIsAnalyzing(true)
-
-        try {
-            const primaryResult = scanResults.find((r) => r.symbol === primaryPair)
-            if (!primaryResult || primaryResult.closePrices.length === 0) {
-                console.warn("Primary pair data not found")
-                setIsAnalyzing(false)
-                return
-            }
-
-            const primaryCloses = primaryResult.closePrices
-            const otherPairs = scanResults.filter((r) => r.symbol !== primaryPair)
-
-            const analyzed: PairAnalysisResult[] = []
-            for (const pair of otherPairs) {
-                if (pair.closePrices.length > 0) {
-                    const result = analyzePair(
-                        primaryCloses,
-                        pair.closePrices,
-                        pair.symbol,
-                        primaryPair
-                    )
-                    analyzed.push(result)
-                }
-            }
-
-            analyzed.sort((a, b) => b.opportunityScore - a.opportunityScore)
-            setAnalysisResults(analyzed)
-        } catch (error) {
-            console.error("Analysis failed:", error)
-        } finally {
-            setIsAnalyzing(false)
-        }
-    }, [])
+    // Analyze all pairs using existing results
+    const analyze = useCallback(() => {
+        analyzeResults(results, currentPrimaryPair)
+    }, [results, currentPrimaryPair, analyzeResults])
 
     const reset = useCallback(() => {
         setProgress({

@@ -16,6 +16,11 @@ const config: Config = {
             },
         },
         extend: {
+            fontFamily: {
+                sans: ["Inter", "sans-serif"],
+                heading: ["Inter", "sans-serif"], // Could swap for Outfit later
+                mono: ["JetBrains Mono", "monospace"],
+            },
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
@@ -51,10 +56,14 @@ const config: Config = {
                     foreground: "hsl(var(--card-foreground))",
                 },
                 bullish: {
-                    DEFAULT: "hsl(142.1, 76.2%, 36.3%)",
+                    DEFAULT: "hsl(148, 80%, 45%)", // Vibrant Green
+                    foreground: "hsl(148, 80%, 10%)",
+                    muted: "hsl(148, 80%, 45%, 0.1)",
                 },
                 bearish: {
-                    DEFAULT: "hsl(346.8, 77.2%, 49.8%)",
+                    DEFAULT: "hsl(0, 90%, 65%)", // Vibrant Red
+                    foreground: "hsl(0, 90%, 10%)",
+                    muted: "hsl(0, 90%, 65%, 0.1)",
                 },
             },
             borderRadius: {
@@ -62,8 +71,22 @@ const config: Config = {
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
             },
+            keyframes: {
+                "accordion-down": {
+                    from: { height: "0" },
+                    to: { height: "var(--radix-accordion-content-height)" },
+                },
+                "accordion-up": {
+                    from: { height: "var(--radix-accordion-content-height)" },
+                    to: { height: "0" },
+                },
+            },
+            animation: {
+                "accordion-down": "accordion-down 0.2s ease-out",
+                "accordion-up": "accordion-up 0.2s ease-out",
+            },
         },
     },
-    plugins: [],
+    plugins: [require("tailwindcss-animate")],
 }
 export default config

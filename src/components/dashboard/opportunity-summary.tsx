@@ -1,7 +1,8 @@
 "use client"
 
-import { TrendingUp, Percent, BarChart3, Zap, Loader2, Sparkles } from "lucide-react"
+import { TrendingUp, Percent, BarChart3, Sparkles } from "lucide-react"
 import { useMemo } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useScan } from "@/components/scan-context"
 
@@ -26,35 +27,51 @@ function SummaryCard({
 }: SummaryCardProps) {
     const trendColor =
         trend === "up"
-            ? "text-emerald-500"
+            ? "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]"
             : trend === "down"
-                ? "text-rose-500"
+                ? "text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]"
                 : "text-muted-foreground"
 
+    if (loading) {
+        return (
+            <Card className="relative overflow-hidden border-white/5 bg-white/5">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+                    <div className="h-8 w-8 bg-white/10 rounded animate-pulse" />
+                </CardHeader>
+                <CardContent>
+                    <div className="h-8 w-16 bg-white/10 rounded animate-pulse mb-2" />
+                    <div className="h-3 w-32 bg-white/10 rounded animate-pulse" />
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
-        <Card className={`relative overflow-hidden ${highlight ? "ring-2 ring-purple-500/50" : ""}`}>
+        <Card className={`relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:bg-white/10 ${highlight ? "border-purple-500/30 bg-purple-500/5 ring-1 ring-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.1)]" : "border-white/5 bg-white/5"
+            }`}>
             <div
-                className={`absolute inset-0 ${highlight
-                        ? "bg-gradient-to-br from-purple-500/10 to-pink-500/10"
-                        : "bg-gradient-to-br from-primary/5 to-transparent"
+                className={`absolute inset-0 pointer-events-none ${highlight
+                    ? "bg-gradient-to-br from-purple-500/10 via-transparent to-transparent"
+                    : "bg-gradient-to-br from-white/5 via-transparent to-transparent"
                     }`}
             />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground/80">{title}</CardTitle>
                 <div
-                    className={`h-8 w-8 rounded-md flex items-center justify-center ${highlight
-                            ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white"
-                            : "bg-primary/10 text-primary"
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${highlight
+                        ? "bg-purple-500/20 text-purple-300"
+                        : "bg-white/5 text-muted-foreground"
                         }`}
                 >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
+                    {icon}
                 </div>
             </CardHeader>
-            <CardContent>
-                <div className={`text-2xl font-bold ${loading ? "text-muted-foreground" : trendColor}`}>
+            <CardContent className="relative z-10">
+                <div className={`text-2xl font-bold tracking-tight ${trendColor}`}>
                     {value}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                <p className="text-xs text-muted-foreground mt-1 font-medium">{description}</p>
             </CardContent>
         </Card>
     )
@@ -108,51 +125,79 @@ export function OpportunitySummary() {
         }
     }, [analysisResults])
 
+    const container = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    }
+
+    const item = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0 }
+    }
+
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <SummaryCard
-                title="Premium Signals"
-                value={isLoading ? "..." : stats.premiumCount.toString()}
-                description="High spread, low volatility opportunities"
-                icon={<Sparkles className="h-4 w-4" />}
-                trend={stats.premiumCount > 0 ? "up" : "neutral"}
-                loading={isLoading}
-                highlight={stats.premiumCount > 0}
-            />
-            <SummaryCard
-                title="Strong Correlations"
-                value={isLoading ? "..." : stats.strongCorrCount.toString()}
-                description="Pairs with correlation > 0.7"
-                icon={<TrendingUp className="h-4 w-4" />}
-                trend={stats.strongCorrCount > 0 ? "up" : "neutral"}
-                loading={isLoading}
-            />
-            <SummaryCard
-                title="Extreme Z-Scores"
-                value={isLoading ? "..." : stats.extremeZCount.toString()}
-                description="Spread divergence > 2σ"
-                icon={<BarChart3 className="h-4 w-4" />}
-                trend={stats.extremeZCount > 0 ? "up" : "neutral"}
-                loading={isLoading}
-            />
-            <SummaryCard
-                title="Avg Opportunity"
-                value={
-                    isLoading
-                        ? "..."
-                        : isComplete && analysisResults.length > 0
-                            ? `${stats.avgOpportunity.toFixed(0)}%`
-                            : "--"
-                }
-                description={
-                    stats.topOpportunity
-                        ? `Top: ${stats.topOpportunity.symbol.replace("USDT", "")} (${stats.topOpportunity.score}%)`
-                        : "Mean score across all pairs"
-                }
-                icon={<Percent className="h-4 w-4" />}
-                trend={stats.avgOpportunity >= 40 ? "up" : "neutral"}
-                loading={isLoading}
-            />
-        </div>
+        <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+        >
+            <motion.div variants={item}>
+                <SummaryCard
+                    title="Premium Signals"
+                    value={isLoading ? "..." : stats.premiumCount.toString()}
+                    description="High spread, low volatility opportunities"
+                    icon={<Sparkles className="h-4 w-4" />}
+                    trend={stats.premiumCount > 0 ? "up" : "neutral"}
+                    loading={isLoading}
+                    highlight={stats.premiumCount > 0}
+                />
+            </motion.div>
+            <motion.div variants={item}>
+                <SummaryCard
+                    title="Strong Correlations"
+                    value={isLoading ? "..." : stats.strongCorrCount.toString()}
+                    description="Pairs with correlation > 0.7"
+                    icon={<TrendingUp className="h-4 w-4" />}
+                    trend={stats.strongCorrCount > 0 ? "up" : "neutral"}
+                    loading={isLoading}
+                />
+            </motion.div>
+            <motion.div variants={item}>
+                <SummaryCard
+                    title="Extreme Z-Scores"
+                    value={isLoading ? "..." : stats.extremeZCount.toString()}
+                    description="Spread divergence > 2σ"
+                    icon={<BarChart3 className="h-4 w-4" />}
+                    trend={stats.extremeZCount > 0 ? "up" : "neutral"}
+                    loading={isLoading}
+                />
+            </motion.div>
+            <motion.div variants={item}>
+                <SummaryCard
+                    title="Avg Opportunity"
+                    value={
+                        isLoading
+                            ? "..."
+                            : isComplete && analysisResults.length > 0
+                                ? `${stats.avgOpportunity.toFixed(0)}%`
+                                : "--"
+                    }
+                    description={
+                        stats.topOpportunity
+                            ? `Top: ${stats.topOpportunity.symbol.replace("USDT", "")} (${stats.topOpportunity.score}%)`
+                            : "Mean score across all pairs"
+                    }
+                    icon={<Percent className="h-4 w-4" />}
+                    trend={stats.avgOpportunity >= 40 ? "up" : "neutral"}
+                    loading={isLoading}
+                />
+            </motion.div>
+        </motion.div>
     )
 }

@@ -129,6 +129,95 @@ export const DEFAULT_FILTER_OPTIONS: FilterOptions = {
     regimes: ["stable_strong", "stable_weak", "stable", "strengthening", "recovering", "weakening", "breaking_down"],
 }
 
+// Multi-Timeframe Confluence Types
+
+export type IntervalType = "1m" | "3m" | "5m" | "15m" | "1h" | "4h" | "1d"
+
+// Extended to support custom resampled intervals like "2m", "7m", "10m"
+
+export interface MultiTimeframeConfluence {
+    confluenceScore: number
+    confidence: "high" | "medium" | "low" | "mixed"
+    timeframeAnalyses: TimeframeAnalysis[]
+    alignedTimeframes: number
+    totalTimeframes: number
+    averageOpportunity: number
+    bestTimeframe: IntervalType | null
+    worstTimeframe: IntervalType | null
+    signalDirection: "long_spread" | "short_spread" | "neutral"
+    zScoreAgreement: number
+    correlationAgreement: number
+    qualityAgreement: number
+}
+
+export interface TimeframeAnalysis {
+    interval: string  // Supports both native ("5m") and custom ("7m") intervals
+    result: PairAnalysisResult
+    weight: number
+}
+
+export interface ConfluenceResult {
+    symbol: string
+    primarySymbol: string
+    confluenceScore: number
+    confidence: "high" | "medium" | "low" | "mixed"
+    timeframeAnalyses: TimeframeAnalysis[]
+    alignedTimeframes: number
+    totalTimeframes: number
+    averageOpportunity: number
+    bestTimeframe: string | null  // e.g., "5m" or "7m"
+    worstTimeframe: string | null
+    signalDirection: "long_spread" | "short_spread" | "neutral"
+    zScoreAgreement: number
+    correlationAgreement: number
+    qualityAgreement: number
+    notes: string[]
+}
+
+// Historical Tracking Types
+
+export interface HistoricalSnapshot {
+    id: string
+    timestamp: number
+    date: string
+    primaryPair: string
+    interval: string
+    results: PairAnalysisResult[]
+    confluenceResults?: ConfluenceResult[]
+    marketContext: {
+        totalPairs: number
+        premiumCount: number
+        strongCorrCount: number
+        avgOpportunity: number
+        marketRegime: "trending" | "ranging" | "choppy" | "unknown"
+    }
+}
+
+export interface PairHistoricalData {
+    symbol: string
+    primarySymbol: string
+    firstSeen: number
+    lastSeen: number
+    totalOccurrences: number
+    avgOpportunityScore: number
+    maxOpportunityScore: number
+    minOpportunityScore: number
+    avgZScore: number
+    avgCorrelation: number
+    signalQualityDistribution: Record<string, number>
+    opportunityTrend: "improving" | "declining" | "stable" | "volatile"
+    recentSignals: HistoricalSignal[]
+}
+
+export interface HistoricalSignal {
+    timestamp: number
+    opportunityScore: number
+    zScore: number
+    correlation: number
+    signalQuality: string
+    wasExtreme: boolean
+}
+
 // Configuration
 
 export interface AppConfig {
@@ -142,7 +231,7 @@ export interface AppConfig {
 export const DEFAULT_CONFIG: AppConfig = {
     primaryPair: "ETHUSDT",
     interval: "1h",
-    totalBars: 500, // Start smaller for quick scans, can be increased
+    totalBars: 500,
     topPairsLimit: 120,
-    refreshIntervalMs: 10 * 60 * 1000, // 10 minutes
+    refreshIntervalMs: 10 * 60 * 1000,
 }

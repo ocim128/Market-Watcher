@@ -97,20 +97,44 @@ export function analyzePair(
         )
     }
 
-    // Calculate opportunity score
+    // Calculate opportunity score with more nuanced formula
+    // The old formula saturated at 100 too easily when |Z-score| >= 3
+
     // Use volatility-adjusted spread Z-score if available, otherwise raw spread Z
     const effectiveSpreadZ = volatilitySpread ? volatilitySpread.adjustedZScore : spreadZScore
-    const spreadOpportunity = clamp((Math.min(3, Math.abs(effectiveSpreadZ)) / 3.0) * 100.0, 0, 100)
+    const absZ = Math.abs(effectiveSpreadZ)
 
-    // Method average (currently just from volatility spread signal strength)
-    const methodAverage = volatilitySpread ? volatilitySpread.signalStrength : 0
-
-    // Overall opportunity: 60% spread, 40% method
-    const opportunityScore = clamp(
-        Math.round(spreadOpportunity * 0.6 + methodAverage * 0.4),
+    // Spread opportunity: Use logarithmic scaling to prevent saturation
+    // Z-score of 1.0 → ~33%, 2.0 → ~50%, 3.0 → ~60%, 5.0 → ~72%
+    // Max approaches ~85% even for very high Z-scores
+    const spreadOpportunity = clamp(
+        (1 - 1 / (1 + absZ * 0.5)) * 100,
         0,
-        100
+        85  // Cap at 85 to never fully saturate from spread alone
     )
+
+    // Correlation quality factor (0-1): Strong correlation = better opportunity
+    // Pairs with weak correlation shouldn't score as high
+    const correlationQuality = clamp(Math.abs(correlation), 0, 1)
+
+    // Signal strength from volatility analysis (0-100)
+    // Also cap this to prevent saturation
+    const methodAverage = volatilitySpread
+        ? clamp(volatilitySpread.signalStrength * 0.7, 0, 70)  // Max 70
+        : 0
+
+    // Combined opportunity score:
+    // - 45% from spread Z-score (log scale, max ~85)
+    // - 30% from volatility signal strength (max 70)
+    // - 25% from correlation quality (0-100 based on |correlation|)
+    const rawScore = (
+        spreadOpportunity * 0.45 +
+        methodAverage * 0.30 +
+        correlationQuality * 25  // Max 25 points from correlation
+    )
+
+    // Apply final scaling - still clamp but scores should naturally vary more
+    const opportunityScore = clamp(Math.round(rawScore), 0, 100)
 
     // Build notes
     const notes = buildNotes(spreadZScore, correlation, correlationVelocity, volatilitySpread)

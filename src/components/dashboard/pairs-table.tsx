@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUpDown, ExternalLink, Loader2, BarChart, Info } from "lucide-react"
+import { ArrowUpDown, ExternalLink, Loader2, BarChart, Info, TrendingUp } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,9 +16,12 @@ import {
 import { useScan } from "@/components/scan-context"
 import { FilterControls } from "./filter-controls"
 import { PairDetailModal } from "./pair-detail-modal"
+import { Sparkline } from "@/components/ui/sparkline"
+import { calculateSpread } from "@/lib/analysis/statistics"
 import { config } from "@/config"
 import { DEFAULT_FILTER_OPTIONS } from "@/types"
 import type { PairAnalysisResult, SignalQuality, FilterOptions } from "@/types"
+import { motion, AnimatePresence } from "framer-motion"
 
 type SortKey =
     | "symbol"
@@ -31,17 +34,17 @@ type SortOrder = "asc" | "desc"
 function getSignalBadgeClass(quality: SignalQuality) {
     switch (quality) {
         case "premium":
-            return "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0"
+            return "bg-emerald-400/10 text-emerald-400 border-emerald-400/20 shadow-[0_0_12px_rgba(52,211,153,0.15)] font-semibold"
         case "strong":
-            return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+            return "bg-cyan-400/10 text-cyan-400 border-cyan-400/20 font-medium"
         case "moderate":
-            return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+            return "bg-amber-400/10 text-amber-400 border-amber-400/20"
         case "weak":
-            return "bg-gray-500/20 text-gray-400 border-gray-500/30"
+            return "bg-slate-400/10 text-slate-400 border-slate-400/20"
         case "noisy":
-            return "bg-red-500/20 text-red-400 border-red-500/30"
+            return "bg-rose-400/10 text-rose-400 border-rose-400/20"
         default:
-            return "bg-gray-500/20 text-gray-400"
+            return "bg-slate-500/10 text-slate-500 border-slate-500/20"
     }
 }
 
@@ -87,13 +90,20 @@ const signalQualityOrder: Record<SignalQuality, number> = {
 }
 
 export function PairsTable() {
-    const { analysisResults, isScanning, isAnalyzing, isComplete, progress, lastScanTime, currentPrimaryPair } =
+    const { analysisResults, results, isScanning, isAnalyzing, isComplete, progress, lastScanTime, currentPrimaryPair } =
         useScan()
     const [sortKey, setSortKey] = useState<SortKey>("opportunityScore")
     const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
     const [selectedPair, setSelectedPair] = useState<PairAnalysisResult | null>(null)
     const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTER_OPTIONS)
     const [searchQuery, setSearchQuery] = useState("")
+
+    // Helper: Map symbols to their price arrays for quick lookup
+    const priceMap = useMemo(() => {
+        const map = new Map<string, number[]>()
+        results.forEach(r => map.set(r.symbol, r.closePrices))
+        return map
+    }, [results])
 
     // Filter the data
     const filteredData = useMemo(() => {
@@ -208,13 +218,13 @@ export function PairsTable() {
 
     return (
         <>
-            <Card>
+            <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                             <CardTitle className="flex items-center gap-2">
                                 Pair Analysis
-                                {(isScanning || isAnalyzing) && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {(isScanning || isAnalyzing) && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                             </CardTitle>
                             <CardDescription>
                                 {currentPrimaryPair} vs Top USDT Pairs • Last scan: {formatLastScan()}
@@ -223,7 +233,7 @@ export function PairsTable() {
                                         {" "}
                                         • Showing {stats.filtered} of {stats.total} pairs
                                         {stats.premium > 0 && (
-                                            <span className="text-purple-400 ml-1">({stats.premium} premium)</span>
+                                            <span className="text-emerald-400 ml-1 font-medium">({stats.premium} premium)</span>
                                         )}
                                     </span>
                                 )}
@@ -235,14 +245,17 @@ export function PairsTable() {
                     {isScanning && progress.total > 0 && (
                         <div className="mt-4">
                             <div className="flex justify-between text-sm text-muted-foreground mb-1">
-                                <span>Fetching {progress.currentSymbol}...</span>
-                                <span>
+                                <span className="flex items-center gap-2">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Fetching {progress.currentSymbol}...
+                                </span>
+                                <span className="font-mono text-xs">
                                     {progress.current} / {progress.total}
                                 </span>
                             </div>
-                            <div className="w-full bg-secondary rounded-full h-2">
+                            <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden">
                                 <div
-                                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                                    className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
                                     style={{ width: `${(progress.current / progress.total) * 100}%` }}
                                 />
                             </div>
@@ -250,9 +263,9 @@ export function PairsTable() {
                     )}
 
                     {isAnalyzing && (
-                        <div className="mt-4 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                            Running statistical analysis...
+                        <div className="mt-4 text-sm text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                            <span className="animate-pulse">Running advanced statistical analysis...</span>
                         </div>
                     )}
 
@@ -271,203 +284,257 @@ export function PairsTable() {
 
                 <CardContent>
                     {sortedData.length > 0 ? (
-                        <div className="overflow-x-auto">
+                        <div className="rounded-md border border-border/50">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[130px]">
+                                <TableHeader className="bg-muted/30">
+                                    <TableRow className="hover:bg-transparent border-border/50">
+                                        <TableHead className="w-[140px]">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="-ml-3 h-8 gap-1"
+                                                className="-ml-3 h-8 gap-1 font-semibold"
                                                 onClick={() => handleSort("symbol")}
                                             >
                                                 Pair
-                                                <ArrowUpDown className="h-4 w-4" />
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                             </Button>
                                         </TableHead>
                                         <TableHead>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="-ml-3 h-8 gap-1"
+                                                className="-ml-3 h-8 gap-1 font-semibold"
                                                 onClick={() => handleSort("correlation")}
                                             >
                                                 Correlation
-                                                <ArrowUpDown className="h-4 w-4" />
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                             </Button>
+                                        </TableHead>
+                                        <TableHead className="w-[120px]">
+                                            <div className="flex items-center gap-1 font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                                                <TrendingUp className="h-3 w-3" />
+                                                Trend (40h)
+                                            </div>
                                         </TableHead>
                                         <TableHead>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="-ml-3 h-8 gap-1"
+                                                className="-ml-3 h-8 gap-1 font-semibold"
                                                 onClick={() => handleSort("spreadZScore")}
                                             >
                                                 Spread Z
-                                                <ArrowUpDown className="h-4 w-4" />
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                             </Button>
                                         </TableHead>
                                         <TableHead>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="-ml-3 h-8 gap-1"
+                                                className="-ml-3 h-8 gap-1 font-semibold"
                                                 onClick={() => handleSort("signalQuality")}
                                             >
                                                 Signal
-                                                <ArrowUpDown className="h-4 w-4" />
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                             </Button>
                                         </TableHead>
-                                        <TableHead>Regime</TableHead>
+                                        <TableHead className="font-semibold">Regime</TableHead>
                                         <TableHead>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="-ml-3 h-8 gap-1"
+                                                className="-ml-3 h-8 gap-1 font-semibold"
                                                 onClick={() => handleSort("opportunityScore")}
                                             >
-                                                Opportunity
-                                                <ArrowUpDown className="h-4 w-4" />
+                                                Opp. Score
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                             </Button>
                                         </TableHead>
-                                        <TableHead className="w-[80px]"></TableHead>
+                                        <TableHead className="w-[100px]"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {sortedData.map((pair) => (
-                                        <TableRow
-                                            key={pair.symbol}
-                                            className="cursor-pointer hover:bg-muted/50"
-                                            onClick={() => setSelectedPair(pair)}
-                                        >
-                                            <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono">{pair.symbol.replace("USDT", "")}</span>
-                                                    <span className="text-xs text-muted-foreground">vs {currentPrimaryPair.replace("USDT", "")}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span
-                                                    className={
-                                                        Math.abs(pair.correlation) >= 0.7
-                                                            ? "text-emerald-500 font-medium"
-                                                            : Math.abs(pair.correlation) >= 0.4
-                                                                ? "text-yellow-500"
-                                                                : "text-muted-foreground"
-                                                    }
+                                    <AnimatePresence mode="popLayout">
+                                        {sortedData.map((pair) => {
+                                            const primaryPrices = priceMap.get(currentPrimaryPair) || []
+                                            const pairPrices = priceMap.get(pair.symbol) || []
+
+                                            // Calculate recent spread for sparkline
+                                            // We'll use last 40 points for visual trend
+                                            let recentSpread: number[] = []
+                                            if (primaryPrices.length > 0 && pairPrices.length > 0) {
+                                                const len = Math.min(primaryPrices.length, pairPrices.length)
+                                                // Ensure we don't exceed bounds
+                                                const lookback = 40
+                                                const startIndex = Math.max(0, len - lookback)
+                                                if (len > 0) {
+                                                    const pSlice = primaryPrices.slice(startIndex, len)
+                                                    const sSlice = pairPrices.slice(startIndex, len)
+                                                    recentSpread = calculateSpread(pSlice, sSlice)
+                                                }
+                                            }
+
+                                            return (
+                                                <motion.tr
+                                                    key={pair.symbol}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: 10 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="border-b transition-colors hover:bg-muted/40 cursor-pointer border-border/50 group relative"
+                                                    onClick={() => setSelectedPair(pair)}
                                                 >
-                                                    {pair.correlation >= 0 ? "+" : ""}
-                                                    {pair.correlation.toFixed(3)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span
-                                                    className={
-                                                        Math.abs(pair.spreadZScore) >= 2
-                                                            ? "text-purple-400 font-bold"
-                                                            : Math.abs(pair.spreadZScore) >= 1
-                                                                ? "text-pink-400"
-                                                                : "text-muted-foreground"
-                                                    }
-                                                >
-                                                    {pair.spreadZScore >= 0 ? "+" : ""}
-                                                    {pair.spreadZScore.toFixed(2)}σ
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={getSignalBadgeClass(pair.volatilitySpread.signalQuality)}
-                                                >
-                                                    {getSignalLabel(pair.volatilitySpread.signalQuality)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-sm">
-                                                    {getRegimeLabel(pair.correlationVelocity.regime)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-16 bg-secondary rounded-full h-2">
-                                                        <div
-                                                            className={`h-2 rounded-full ${pair.opportunityScore >= 70
-                                                                ? "bg-emerald-500"
-                                                                : pair.opportunityScore >= 40
-                                                                    ? "bg-yellow-500"
-                                                                    : "bg-muted-foreground"
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-foreground">{pair.symbol.replace("USDT", "")}</span>
+                                                                <span className="text-[10px] text-muted-foreground">vs {currentPrimaryPair.replace("USDT", "")}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span
+                                                                className={`font-mono font-medium ${Math.abs(pair.correlation) >= 0.7
+                                                                    ? "text-emerald-400"
+                                                                    : Math.abs(pair.correlation) >= 0.4
+                                                                        ? "text-yellow-400"
+                                                                        : "text-muted-foreground"
+                                                                    }`}
+                                                            >
+                                                                {pair.correlation >= 0 ? "+" : ""}
+                                                                {pair.correlation.toFixed(3)}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="w-24 h-8">
+                                                            <Sparkline
+                                                                data={recentSpread}
+                                                                width={96}
+                                                                height={32}
+                                                                color={recentSpread.length > 0 && recentSpread[recentSpread.length - 1] >= recentSpread[0] ? "#34d399" : "#fb7185"}
+                                                                fill={true}
+                                                            />
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span
+                                                            className={`font-mono font-bold ${Math.abs(pair.spreadZScore) >= 2
+                                                                ? "text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.3)]"
+                                                                : Math.abs(pair.spreadZScore) >= 1
+                                                                    ? "text-pink-400"
+                                                                    : "text-muted-foreground"
                                                                 }`}
-                                                            style={{ width: `${pair.opportunityScore}%` }}
-                                                        />
-                                                    </div>
-                                                    <span
-                                                        className={`font-mono text-sm ${pair.opportunityScore >= 70
-                                                            ? "text-emerald-500"
-                                                            : pair.opportunityScore >= 40
-                                                                ? "text-yellow-500"
-                                                                : "text-muted-foreground"
-                                                            }`}
-                                                    >
-                                                        {pair.opportunityScore}%
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setSelectedPair(pair)
-                                                        }}
-                                                    >
-                                                        <Info className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            window.open(
-                                                                `https://www.tradingview.com/chart/?symbol=BINANCE:${pair.symbol}`,
-                                                                "_blank"
-                                                            )
-                                                        }}
-                                                    >
-                                                        <ExternalLink className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                                        >
+                                                            {pair.spreadZScore >= 0 ? "+" : ""}
+                                                            {pair.spreadZScore.toFixed(2)}σ
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`uppercase text-[10px] tracking-wider ${getSignalBadgeClass(pair.volatilitySpread.signalQuality)}`}
+                                                        >
+                                                            {getSignalLabel(pair.volatilitySpread.signalQuality).split(" ")[1] || pair.volatilitySpread.signalQuality}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {getRegimeLabel(pair.correlationVelocity.regime)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-16 h-1.5 bg-secondary/50 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full ${pair.opportunityScore >= 70
+                                                                        ? "bg-gradient-to-r from-emerald-500 to-emerald-300"
+                                                                        : pair.opportunityScore >= 40
+                                                                            ? "bg-yellow-500"
+                                                                            : "bg-muted-foreground"
+                                                                        }`}
+                                                                    style={{ width: `${pair.opportunityScore}%` }}
+                                                                />
+                                                            </div>
+                                                            <span
+                                                                className={`font-mono text-sm font-bold ${pair.opportunityScore >= 70
+                                                                    ? "text-emerald-400"
+                                                                    : pair.opportunityScore >= 40
+                                                                        ? "text-yellow-400"
+                                                                        : "text-muted-foreground"
+                                                                    }`}
+                                                            >
+                                                                {pair.opportunityScore}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                                                                title="View Details"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setSelectedPair(pair)
+                                                                }}
+                                                            >
+                                                                <Info className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 hover:bg-blue-500/10 hover:text-blue-400"
+                                                                title="Open in TradingView"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    window.open(
+                                                                        `https://www.tradingview.com/chart/?symbol=BINANCE:${pair.symbol}`,
+                                                                        "_blank"
+                                                                    )
+                                                                }}
+                                                            >
+                                                                <ExternalLink className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </motion.tr>
+                                            )
+                                        })}
+                                    </AnimatePresence>
                                 </TableBody>
                             </Table>
                         </div>
                     ) : analysisResults.length > 0 ? (
                         /* No results after filtering */
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-muted p-3 mb-4">
-                                <BarChart className="h-6 w-6 text-muted-foreground" />
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="rounded-full bg-muted/30 p-4 mb-4">
+                                <BarChart className="h-8 w-8 text-muted-foreground/50" />
                             </div>
-                            <h3 className="font-semibold text-lg mb-1">No Matching Pairs</h3>
-                            <p className="text-muted-foreground text-sm max-w-sm">
-                                No pairs match your current filters. Try adjusting the filter criteria.
+                            <h3 className="font-semibold text-lg mb-2">No Matching Pairs</h3>
+                            <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                                No pairs match your current filters. Try relaxing the correlation or signal quality criteria.
                             </p>
+                            <Button
+                                variant="link"
+                                onClick={() => setFilters(DEFAULT_FILTER_OPTIONS)}
+                                className="mt-4 text-primary"
+                            >
+                                Clear all filters
+                            </Button>
                         </div>
                     ) : (
                         /* Empty state */
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="rounded-full bg-muted p-3 mb-4">
-                                <BarChart className="h-6 w-6 text-muted-foreground" />
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="rounded-full bg-primary/10 p-4 mb-4 ring-1 ring-primary/20">
+                                <BarChart className="h-8 w-8 text-primary" />
                             </div>
-                            <h3 className="font-semibold text-lg mb-1">Ready to Scan</h3>
-                            <p className="text-muted-foreground text-sm max-w-sm">
-                                Click "Scan Pairs" to analyze correlations between {currentPrimaryPair} and the
-                                top {config.topPairsLimit} USDT pairs on Binance.
+                            <h3 className="font-semibold text-lg mb-2">Ready to Scan</h3>
+                            <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-6">
+                                Click "Scan Pairs" to analyze correlations between <span className="text-foreground font-mono">{currentPrimaryPair}</span> and the
+                                top {config.topPairsLimit} USDT pairs.
                             </p>
                         </div>
                     )}

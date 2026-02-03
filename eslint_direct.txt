@@ -1,0 +1,107 @@
+﻿node.exe : 
+At C:\Program 
+Files\nodejs\npx.ps1:29 
+char:3
++   & $NODE_EXE $NPX_CLI_JS 
+$args
++   
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (:String  
+  ) [], RemoteException
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+Oops! Something went wrong! 
+:(
+
+ESLint: 8.57.1
+
+TypeError: Converting 
+circular structure to JSON
+    --> starting at object 
+with constructor 'Object'
+    |     property 'configs' 
+-> object with constructor 
+'Object'
+    |     property 'flat' -> 
+object with constructor 
+'Object'
+    |     ...
+    |     property 'plugins' 
+-> object with constructor 
+'Object'
+    --- property 'react' 
+closes the circle
+Referenced from: C:\Users\use
+r\Documents\Repo\Experimental
+\lightweight-charts\debug\pla
+yground\Market-Watcher\.eslin
+trc.json
+    at JSON.stringify 
+(<anonymous>)
+    at C:\Users\user\Document
+s\Repo\Experimental\lightweig
+ht-charts\debug\playground\Ma
+rket-Watcher\node_modules\esl
+int\node_modules\@eslint\esli
+ntrc\dist\eslintrc.cjs:2156:4
+5
+    at Array.map 
+(<anonymous>)
+    at 
+ConfigValidator.formatErrors 
+(C:\Users\user\Documents\Repo
+\Experimental\lightweight-cha
+rts\debug\playground\Market-W
+atcher\node_modules\eslint\no
+de_modules\@eslint\eslintrc\d
+ist\eslintrc.cjs:2147:23)
+    at ConfigValidator.valida
+teConfigSchema (C:\Users\user
+\Documents\Repo\Experimental\
+lightweight-charts\debug\play
+ground\Market-Watcher\node_mo
+dules\eslint\node_modules\@es
+lint\eslintrc\dist\eslintrc.c
+js:2177:84)
+    at ConfigArrayFactory._no
+rmalizeConfigData (C:\Users\u
+ser\Documents\Repo\Experiment
+al\lightweight-charts\debug\p
+layground\Market-Watcher\node
+_modules\eslint\node_modules\
+@eslint\eslintrc\dist\eslintr
+c.cjs:3019:19)
+    at ConfigArrayFactory._lo
+adConfigData (C:\Users\user\D
+ocuments\Repo\Experimental\li
+ghtweight-charts\debug\playgr
+ound\Market-Watcher\node_modu
+les\eslint\node_modules\@esli
+nt\eslintrc\dist\eslintrc.cjs
+:2984:21)
+    at ConfigArrayFactory._lo
+adExtendedShareableConfig (C:
+\Users\user\Documents\Repo\Ex
+perimental\lightweight-charts
+\debug\playground\Market-Watc
+her\node_modules\eslint\node_
+modules\@eslint\eslintrc\dist
+\eslintrc.cjs:3285:21)
+    at ConfigArrayFactory._lo
+adExtends (C:\Users\user\Docu
+ments\Repo\Experimental\light
+weight-charts\debug\playgroun
+d\Market-Watcher\node_modules
+\eslint\node_modules\@eslint\
+eslintrc\dist\eslintrc.cjs:31
+56:25)
+    at ConfigArrayFactory._no
+rmalizeObjectConfigDataBody (
+C:\Users\user\Documents\Repo\
+Experimental\lightweight-char
+ts\debug\playground\Market-Wa
+tcher\node_modules\eslint\nod
+e_modules\@eslint\eslintrc\di
+st\eslintrc.cjs:3095:25)

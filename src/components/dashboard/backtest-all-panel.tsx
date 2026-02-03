@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { useScan } from "@/components/scan-context"
 import { runBacktest } from "@/lib/analysis/backtest-engine"
-import { config } from "@/config"
 import type { BacktestConfig, BacktestResult } from "@/types/backtest-types"
 import { DEFAULT_BACKTEST_CONFIG } from "@/types/backtest-types"
+import { motion, AnimatePresence } from "framer-motion"
+import { Sparkline } from "@/components/ui/sparkline"
 
 interface BacktestAllPanelProps {
     onPairClick?: (symbol: string) => void
@@ -150,20 +151,22 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
     }, [backtestResults])
 
     return (
-        <Card className="mb-6">
-            <CardHeader className="pb-4">
+        <Card className="mb-6 border-border/40 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-4 border-b border-border/40">
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-lg flex items-center gap-2">
-                            📊 Backtest All Pairs
+                            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent font-bold">
+                                Backtest Strategy
+                            </span>
                             {eligiblePairs.length > 0 && (
-                                <Badge variant="outline" className="font-normal">
-                                    {eligiblePairs.length} eligible pairs
+                                <Badge variant="outline" className="font-mono font-normal text-xs border-primary/20 bg-primary/5 text-primary">
+                                    {eligiblePairs.length} PAIRS
                                 </Badge>
                             )}
                         </CardTitle>
                         <CardDescription>
-                            Run backtest on all pairs meeting correlation threshold
+                            Simulate strategy across market data
                         </CardDescription>
                     </div>
                     <div className="flex gap-2">
@@ -172,247 +175,290 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
                             size="sm"
                             onClick={handleReset}
                             disabled={isRunning}
+                            className="text-xs h-8 border-border/50 hover:bg-white/5"
                         >
-                            <RotateCcw className="h-4 w-4 mr-1" />
+                            <RotateCcw className="h-3.5 w-3.5 mr-1" />
                             Reset
                         </Button>
                         <Button
                             size="sm"
                             onClick={handleRunAll}
                             disabled={isRunning || eligiblePairs.length === 0}
-                            className="bg-gradient-to-r from-purple-500 to-pink-500"
+                            className="h-8 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border-0 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
                         >
-                            <Play className="h-4 w-4 mr-1" />
-                            {isRunning ? `Running ${progress.current}/${progress.total}...` : "Run All"}
+                            <Play className="h-3.5 w-3.5 mr-1 fill-current" />
+                            {isRunning ? `Running ${progress.current}/${progress.total}...` : "Run Backtest"}
                         </Button>
                     </div>
                 </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6 pt-6">
                 {/* Configuration */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
-                    <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
-                            Entry Spread (|Z|)
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-secondary/30 rounded-xl border border-white/5">
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                            Entry Z-Score
                         </label>
-                        <input
-                            type="number"
-                            step="0.5"
-                            min="1"
-                            max="5"
-                            value={btConfig.entrySpreadThreshold}
-                            onChange={(e) => setConfig({ entrySpreadThreshold: Math.abs(parseFloat(e.target.value)) || 3 })}
-                            className="w-full px-2 py-1 rounded bg-background border text-sm"
-                        />
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.5"
+                                min="1"
+                                max="5"
+                                value={btConfig.entrySpreadThreshold}
+                                onChange={(e) => setConfig({ entrySpreadThreshold: Math.abs(parseFloat(e.target.value)) || 3 })}
+                                className="w-full px-3 py-2 rounded-lg bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                             Min Correlation
                         </label>
-                        <input
-                            type="number"
-                            step="0.05"
-                            min="0.5"
-                            max="0.95"
-                            value={btConfig.minCorrelation}
-                            onChange={(e) => setConfig({ minCorrelation: parseFloat(e.target.value) || 0.7 })}
-                            className="w-full px-2 py-1 rounded bg-background border text-sm"
-                        />
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.05"
+                                min="0.5"
+                                max="0.95"
+                                value={btConfig.minCorrelation}
+                                onChange={(e) => setConfig({ minCorrelation: parseFloat(e.target.value) || 0.7 })}
+                                className="w-full px-3 py-2 rounded-lg bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
-                            Take Profit (%)
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                            Take Profit %
                         </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            max="5"
-                            value={btConfig.takeProfitPercent}
-                            onChange={(e) => setConfig({ takeProfitPercent: parseFloat(e.target.value) || 0.5 })}
-                            className="w-full px-2 py-1 rounded bg-background border text-sm"
-                        />
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                max="5"
+                                value={btConfig.takeProfitPercent}
+                                onChange={(e) => setConfig({ takeProfitPercent: parseFloat(e.target.value) || 0.5 })}
+                                className="w-full px-3 py-2 rounded-lg bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono text-emerald-400"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs text-muted-foreground block mb-1">
-                            Stop Loss (%)
+                    <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                            Stop Loss %
                         </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            max="5"
-                            value={btConfig.stopLossPercent}
-                            onChange={(e) => setConfig({ stopLossPercent: parseFloat(e.target.value) || 0.5 })}
-                            className="w-full px-2 py-1 rounded bg-background border text-sm"
-                        />
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                max="5"
+                                value={btConfig.stopLossPercent}
+                                onChange={(e) => setConfig({ stopLossPercent: parseFloat(e.target.value) || 0.5 })}
+                                className="w-full px-3 py-2 rounded-lg bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono text-rose-400"
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Combined Summary */}
-                {sortedResults.length > 0 && (
-                    <>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <Card>
-                                <CardContent className="pt-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                                        <Target className="h-3 w-3" />
-                                        Combined Profit
-                                    </div>
-                                    <div className={`text-xl font-bold ${combinedStats.combinedProfit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                        {formatPercent(combinedStats.combinedProfit)}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                                        <TrendingUp className="h-3 w-3" />
-                                        Total Win Rate
-                                    </div>
-                                    <div className={`text-xl font-bold ${combinedStats.averageWinRate >= 50 ? "text-emerald-500" : "text-yellow-500"}`}>
-                                        {combinedStats.averageWinRate.toFixed(1)}%
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                                        <Trophy className="h-3 w-3" />
-                                        Profitable Pairs
-                                    </div>
-                                    <div className="text-xl font-bold">
-                                        {combinedStats.profitablePairs}/{combinedStats.totalPairs}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                                        <TrendingUp className="h-3 w-3" />
-                                        Best Pair
-                                    </div>
-                                    <div className="text-sm font-bold text-emerald-400">
-                                        {combinedStats.bestPair?.symbol.replace("USDT", "")}
-                                        <span className="ml-1 text-xs">
-                                            {combinedStats.bestPair && formatPercent(combinedStats.bestPair.profit)}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-4">
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                                        <TrendingDown className="h-3 w-3" />
-                                        Worst Pair
-                                    </div>
-                                    <div className="text-sm font-bold text-red-400">
-                                        {combinedStats.worstPair?.symbol.replace("USDT", "")}
-                                        <span className="ml-1 text-xs">
-                                            {combinedStats.worstPair && formatPercent(combinedStats.worstPair.profit)}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                <AnimatePresence>
+                    {sortedResults.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.4, ease: "easeOut" }}
+                            className="space-y-6"
+                        >
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <Card className="bg-secondary/20 border-white/5">
+                                    <CardContent className="pt-4 px-4 pb-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-2">
+                                            <Target className="h-3 w-3" />
+                                            Profit
+                                        </div>
+                                        <div className={`text-2xl font-bold font-mono tracking-tight ${combinedStats.combinedProfit >= 0 ? "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]" : "text-rose-400"}`}>
+                                            {formatPercent(combinedStats.combinedProfit)}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-secondary/20 border-white/5">
+                                    <CardContent className="pt-4 px-4 pb-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-2">
+                                            <TrendingUp className="h-3 w-3" />
+                                            Win Rate
+                                        </div>
+                                        <div className={`text-2xl font-bold font-mono tracking-tight ${combinedStats.averageWinRate >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
+                                            {combinedStats.averageWinRate.toFixed(1)}%
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-secondary/20 border-white/5">
+                                    <CardContent className="pt-4 px-4 pb-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-2">
+                                            <Trophy className="h-3 w-3" />
+                                            Success
+                                        </div>
+                                        <div className="text-2xl font-bold font-mono tracking-tight text-primary">
+                                            {combinedStats.profitablePairs}<span className="text-muted-foreground text-lg">/{combinedStats.totalPairs}</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-secondary/20 border-white/5">
+                                    <CardContent className="pt-4 px-4 pb-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-2">
+                                            <TrendingUp className="h-3 w-3" />
+                                            Best
+                                        </div>
+                                        <div className="text-sm font-bold text-emerald-400 font-mono">
+                                            {combinedStats.bestPair?.symbol.replace("USDT", "")}
+                                            <div className="text-xs opacity-70">
+                                                {combinedStats.bestPair && formatPercent(combinedStats.bestPair.profit)}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-secondary/20 border-white/5">
+                                    <CardContent className="pt-4 px-4 pb-4">
+                                        <div className="flex items-center gap-2 text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-2">
+                                            <TrendingDown className="h-3 w-3" />
+                                            Worst
+                                        </div>
+                                        <div className="text-sm font-bold text-rose-400 font-mono">
+                                            {combinedStats.worstPair?.symbol.replace("USDT", "")}
+                                            <div className="text-xs opacity-70">
+                                                {combinedStats.worstPair && formatPercent(combinedStats.worstPair.profit)}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
-                        {/* Additional Stats Row */}
-                        <div className="grid grid-cols-4 gap-4 text-sm p-3 bg-muted/30 rounded-lg">
-                            <div>
-                                <span className="text-muted-foreground">Total Trades:</span>
-                                <span className="ml-2 font-mono">{combinedStats.totalTrades}</span>
+                            {/* Additional Stats Row */}
+                            <div className="grid grid-cols-4 gap-4 text-xs p-4 bg-muted/10 rounded-lg border border-white/5 font-mono">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">Trades</span>
+                                    <span className="text-foreground">{combinedStats.totalTrades}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">Wins</span>
+                                    <span className="text-emerald-400">{combinedStats.totalWins}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">Losses</span>
+                                    <span className="text-rose-400">{combinedStats.totalLosses}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">Avg/Pair</span>
+                                    <span className={`${combinedStats.combinedProfit / combinedStats.totalPairs >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                        {formatPercent(combinedStats.combinedProfit / combinedStats.totalPairs)}
+                                    </span>
+                                </div>
                             </div>
-                            <div>
-                                <span className="text-muted-foreground">Wins:</span>
-                                <span className="ml-2 font-mono text-emerald-400">{combinedStats.totalWins}</span>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">Losses:</span>
-                                <span className="ml-2 font-mono text-red-400">{combinedStats.totalLosses}</span>
-                            </div>
-                            <div>
-                                <span className="text-muted-foreground">Avg Per Pair:</span>
-                                <span className={`ml-2 font-mono ${combinedStats.combinedProfit / combinedStats.totalPairs >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                    {formatPercent(combinedStats.combinedProfit / combinedStats.totalPairs)}
-                                </span>
-                            </div>
-                        </div>
 
-                        {/* Results Table */}
-                        <div className="max-h-96 overflow-y-auto">
-                            <table className="w-full text-sm">
-                                <thead className="sticky top-0 bg-card">
-                                    <tr className="text-muted-foreground text-xs border-b">
-                                        <th className="text-left py-2 px-2">#</th>
-                                        <th className="text-left py-2 px-2">Pair</th>
-                                        <th className="text-right py-2 px-2">Trades</th>
-                                        <th className="text-right py-2 px-2">W/L</th>
-                                        <th className="text-right py-2 px-2">Win Rate</th>
-                                        <th className="text-right py-2 px-2">Profit</th>
-                                        <th className="text-right py-2 px-2">Max DD</th>
-                                        <th className="text-right py-2 px-2">PF</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sortedResults.map((result, idx) => (
-                                        <tr
-                                            key={result.symbol}
-                                            className="border-b border-muted/30 hover:bg-muted/20 cursor-pointer"
-                                            onClick={() => onPairClick?.(result.symbol)}
-                                        >
-                                            <td className="py-2 px-2 text-muted-foreground">{idx + 1}</td>
-                                            <td className="py-2 px-2 font-medium">
-                                                {result.symbol.replace("USDT", "")}
-                                                <span className="text-muted-foreground text-xs ml-1">vs {currentPrimaryPair.replace("USDT", "")}</span>
-                                            </td>
-                                            <td className="py-2 px-2 text-right font-mono">{result.summary.totalTrades}</td>
-                                            <td className="py-2 px-2 text-right">
-                                                <span className="text-emerald-400">{result.summary.winningTrades}</span>
-                                                <span className="text-muted-foreground">/</span>
-                                                <span className="text-red-400">{result.summary.losingTrades}</span>
-                                            </td>
-                                            <td className={`py-2 px-2 text-right font-mono ${result.summary.winRate >= 50 ? "text-emerald-400" : "text-yellow-400"}`}>
-                                                {result.summary.winRate.toFixed(1)}%
-                                            </td>
-                                            <td className={`py-2 px-2 text-right font-mono font-bold ${result.summary.totalProfitPercent >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                                {formatPercent(result.summary.totalProfitPercent)}
-                                            </td>
-                                            <td className="py-2 px-2 text-right font-mono text-red-400">
-                                                {formatPercent(-Math.abs(result.summary.maxDrawdownPercent))}
-                                            </td>
-                                            <td className="py-2 px-2 text-right font-mono">
-                                                {result.summary.profitFactor === Infinity ? "∞" : result.summary.profitFactor.toFixed(2)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                )}
+                            {/* Results Table */}
+                            <div className="rounded-lg border border-white/5 overflow-hidden">
+                                <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                                            <tr className="border-b border-white/5">
+                                                <th className="text-left py-3 px-4 w-12">#</th>
+                                                <th className="text-left py-3 px-4">Pair</th>
+                                                <th className="text-right py-3 px-4">Trades</th>
+                                                <th className="text-right py-3 px-4">W/L</th>
+                                                <th className="text-left py-3 px-4 w-24">Equity</th>
+                                                <th className="text-right py-3 px-4">Win Rate</th>
+                                                <th className="text-right py-3 px-4">Profit</th>
+                                                <th className="text-right py-3 px-4">Drawdown</th>
+                                                <th className="text-right py-3 px-4">PF</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {sortedResults.map((result, idx) => (
+                                                <tr
+                                                    key={result.symbol}
+                                                    className="hover:bg-white/5 cursor-pointer transition-colors group"
+                                                    onClick={() => onPairClick?.(result.symbol)}
+                                                >
+                                                    <td className="py-2.5 px-4 text-muted-foreground font-mono text-xs">{idx + 1}</td>
+                                                    <td className="py-2.5 px-4 font-medium relative">
+                                                        <span className="text-foreground">{result.symbol.replace("USDT", "")}</span>
+                                                        <span className="text-[10px] text-muted-foreground ml-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                            vs {currentPrimaryPair.replace("USDT", "")}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-4 text-right font-mono text-muted-foreground">{result.summary.totalTrades}</td>
+                                                    <td className="py-2.5 px-4 text-right font-mono text-xs">
+                                                        <span className="text-emerald-400">{result.summary.winningTrades}</span>
+                                                        <span className="text-muted-foreground mx-1">/</span>
+                                                        <span className="text-rose-400">{result.summary.losingTrades}</span>
+                                                    </td>
+                                                    <td className="py-2.5 px-4">
+                                                        <div className="w-20 h-6">
+                                                            <Sparkline
+                                                                data={result.equityCurve}
+                                                                width={80}
+                                                                height={24}
+                                                                color={result.equityCurve[result.equityCurve.length - 1] >= 0 ? "#34d399" : "#fb7185"}
+                                                                strokeWidth={1.5}
+                                                                fill={true}
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className={`py-2.5 px-4 text-right font-mono ${result.summary.winRate >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
+                                                        {result.summary.winRate.toFixed(0)}%
+                                                    </td>
+                                                    <td className={`py-2.5 px-4 text-right font-mono font-bold ${result.summary.totalProfitPercent >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                                        {formatPercent(result.summary.totalProfitPercent)}
+                                                    </td>
+                                                    <td className="py-2.5 px-4 text-right font-mono text-rose-400 text-xs">
+                                                        {formatPercent(-Math.abs(result.summary.maxDrawdownPercent))}
+                                                    </td>
+                                                    <td className="py-2.5 px-4 text-right font-mono text-xs text-muted-foreground">
+                                                        {result.summary.profitFactor === Infinity ? "∞" : result.summary.profitFactor.toFixed(2)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* No eligible pairs */}
                 {eligiblePairs.length === 0 && analysisResults.length > 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
-                        <p>No pairs meet the correlation threshold ({btConfig.minCorrelation}).</p>
-                        <p className="text-sm mt-2">Try lowering the min correlation requirement.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                        <div className="rounded-full bg-yellow-500/10 p-3 mb-4">
+                            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+                        </div>
+                        <p className="font-medium text-foreground">No Eligible Pairs</p>
+                        <p className="text-sm mt-1 max-w-xs">No pairs meet the minimum correlation threshold of {btConfig.minCorrelation}. Try lowering it.</p>
                     </div>
                 )}
 
                 {/* Initial state */}
                 {analysisResults.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <p>Scan pairs first, then run backtest on all eligible pairs.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground border-2 border-dashed border-white/5 rounded-xl">
+                        <div className="rounded-full bg-primary/10 p-4 mb-4">
+                            <Target className="h-8 w-8 text-primary/50" />
+                        </div>
+                        <p className="font-medium text-foreground">Ready for Analysis</p>
+                        <p className="text-sm mt-1 max-w-xs">Scan the market first to identify correlated pairs for backtesting.</p>
                     </div>
                 )}
 
                 {/* After running but no results with trades */}
                 {backtestResults.length > 0 && sortedResults.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <p>No trades found for any pair with current parameters.</p>
-                        <p className="text-sm mt-2">Try lowering the entry spread threshold.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                        <div className="rounded-full bg-muted p-3 mb-4">
+                            <TrendingDown className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium text-foreground">No Trades Found</p>
+                        <p className="text-sm mt-1 max-w-xs">The strategy didn't trigger any trades with current settings. Try lowering the entry threshold.</p>
                     </div>
                 )}
             </CardContent>

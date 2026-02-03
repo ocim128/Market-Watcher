@@ -72,8 +72,11 @@ export function calculateVolatilityAdjustedSpread(
         combinedVolatility > EPSILON ? 1.0 / (1.0 + combinedVolatility * 10) : 1.0
     const adjustedZScore = rawZScore * (1.0 + volatilityFactor)
 
-    // Calculate signal strength (0-100)
-    const signalStrength = clamp((Math.abs(adjustedZScore) / 3.0) * 100.0, 0, 100)
+    // Calculate signal strength (0-100) using logarithmic scaling
+    // This prevents saturation at 100 for high Z-scores
+    // Z=1 → ~33, Z=2 → ~50, Z=3 → ~60, Z=5 → ~71
+    const absAdjustedZ = Math.abs(adjustedZScore)
+    const signalStrength = clamp((1 - 1 / (1 + absAdjustedZ * 0.5)) * 100, 0, 85)
 
     // Determine signal quality
     const signalQuality = determineSignalQuality(adjustedZScore, rawZScore, combinedVolatility)
