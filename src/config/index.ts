@@ -60,6 +60,14 @@ export const config = {
         spreadWeight: 0.6,
         methodWeight: 0.4,
     },
+
+    // Backtest settings
+    backtest: {
+        entrySpreadThreshold: 3,     // |spread z-score| > 3 to enter
+        minCorrelation: 0.7,         // Minimum correlation filter
+        takeProfitPercent: 0.5,      // 0.5% TP
+        stopLossPercent: 0.5,        // 0.5% SL
+    },
 }
 
 export type Config = typeof config

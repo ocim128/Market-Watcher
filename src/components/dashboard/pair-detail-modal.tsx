@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { SpreadChart } from "@/components/charts/spread-chart"
 import { PriceComparisonChart } from "@/components/charts/price-comparison-chart"
+import { BacktestPanel } from "@/components/dashboard/backtest-panel"
 import { useScan } from "@/components/scan-context"
 import { calculateSpread, pearsonCorrelation, calculateReturns } from "@/lib/analysis"
 import { config } from "@/config"
@@ -151,10 +152,10 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                             <CardContent>
                                 <div
                                     className={`text-2xl font-bold ${Math.abs(pair.correlation) >= 0.7
-                                            ? "text-emerald-500"
-                                            : Math.abs(pair.correlation) >= 0.4
-                                                ? "text-yellow-500"
-                                                : "text-muted-foreground"
+                                        ? "text-emerald-500"
+                                        : Math.abs(pair.correlation) >= 0.4
+                                            ? "text-yellow-500"
+                                            : "text-muted-foreground"
                                         }`}
                                 >
                                     {pair.correlation >= 0 ? "+" : ""}
@@ -173,10 +174,10 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                             <CardContent>
                                 <div
                                     className={`text-2xl font-bold ${Math.abs(pair.spreadZScore) >= 2
-                                            ? "text-purple-400"
-                                            : Math.abs(pair.spreadZScore) >= 1
-                                                ? "text-pink-400"
-                                                : "text-muted-foreground"
+                                        ? "text-purple-400"
+                                        : Math.abs(pair.spreadZScore) >= 1
+                                            ? "text-pink-400"
+                                            : "text-muted-foreground"
                                         }`}
                                 >
                                     {pair.spreadZScore >= 0 ? "+" : ""}
@@ -209,10 +210,10 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                             <CardContent>
                                 <div
                                     className={`text-2xl font-bold ${pair.opportunityScore >= 70
-                                            ? "text-emerald-500"
-                                            : pair.opportunityScore >= 40
-                                                ? "text-yellow-500"
-                                                : "text-muted-foreground"
+                                        ? "text-emerald-500"
+                                        : pair.opportunityScore >= 40
+                                            ? "text-yellow-500"
+                                            : "text-muted-foreground"
                                         }`}
                                 >
                                     {pair.opportunityScore}%
@@ -280,6 +281,9 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
                             </ul>
                         </CardContent>
                     </Card>
+
+                    {/* Backtest Panel */}
+                    <BacktestPanel symbol={pair.symbol} />
 
                     {/* Detailed Metrics */}
                     <Card>
