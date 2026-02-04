@@ -1,13 +1,16 @@
 /* eslint-disable max-lines */
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Play, RotateCcw, TrendingUp, TrendingDown, Target, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useScan } from '@/components/scan-context'
 import { useBacktest } from '@/hooks/use-backtest'
+import { useOptimizedParams } from '@/hooks/use-optimized-params'
+import { OptimizationPanel } from '@/components/dashboard/optimization-panel'
+import { OptimizationBadge } from '@/components/dashboard/optimization-badge'
 import type { Trade } from '@/types/backtest-types'
 
 interface BacktestPanelProps {
@@ -322,6 +325,16 @@ interface PriceData {
 function useBacktestPanelState(symbol: string) {
   const { results, currentPrimaryPair } = useScan()
   const { config: btConfig, setConfig, result, isRunning, run, reset } = useBacktest()
+  const {
+    optimizedParams,
+    settings,
+    isOptimizing,
+    error: optimizationError,
+    setSettings,
+    optimize,
+    applyOptimizedConfig,
+    resetOptimization,
+  } = useOptimizedParams()
 
   const priceData: PriceData | null = useMemo(() => {
     const primaryResult = results.find(r => r.symbol === currentPrimaryPair)
@@ -342,7 +355,38 @@ function useBacktestPanelState(symbol: string) {
     run(priceData.primaryCloses, priceData.secondaryCloses, symbol, currentPrimaryPair)
   }
 
-  return { btConfig, setConfig, result, isRunning, reset, priceData, handleRun, currentPrimaryPair }
+  const handleOptimize = () => {
+    if (!priceData) {
+      return
+    }
+    optimize(priceData.primaryCloses, priceData.secondaryCloses)
+  }
+
+  const handleApplyOptimized = () => {
+    applyOptimizedConfig(setConfig)
+  }
+
+  useEffect(() => {
+    resetOptimization()
+  }, [symbol, currentPrimaryPair, resetOptimization])
+
+  return {
+    btConfig,
+    setConfig,
+    result,
+    isRunning,
+    reset,
+    priceData,
+    handleRun,
+    currentPrimaryPair,
+    optimizedParams,
+    settings,
+    isOptimizing,
+    optimizationError,
+    setSettings,
+    handleOptimize,
+    handleApplyOptimized,
+  }
 }
 
 function PanelHeader({
@@ -350,17 +394,22 @@ function PanelHeader({
   onReset,
   onRun,
   hasPriceData,
+  optimizedParams,
 }: {
   isRunning: boolean
   onReset: () => void
   onRun: () => void
   hasPriceData: boolean
+  optimizedParams: ReturnType<typeof useOptimizedParams>['optimizedParams']
 }) {
   return (
     <CardHeader className="pb-4">
       <div className="flex items-center justify-between">
         <div>
-          <CardTitle className="text-lg">📊 Backtest</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            Backtest
+            <OptimizationBadge optimizedParams={optimizedParams} />
+          </CardTitle>
           <CardDescription>
             Simulate trading performance with configurable parameters
           </CardDescription>
@@ -395,6 +444,13 @@ export function BacktestPanel({ symbol }: BacktestPanelProps) {
     priceData,
     handleRun,
     currentPrimaryPair,
+    optimizedParams,
+    settings,
+    isOptimizing,
+    optimizationError,
+    setSettings,
+    handleOptimize,
+    handleApplyOptimized,
   } = useBacktestPanelState(symbol)
 
   return (
@@ -404,10 +460,21 @@ export function BacktestPanel({ symbol }: BacktestPanelProps) {
         onReset={reset}
         onRun={handleRun}
         hasPriceData={!!priceData}
+        optimizedParams={optimizedParams}
       />
 
       <CardContent className="space-y-4">
         <BacktestConfig config={btConfig} onChange={setConfig} />
+        <OptimizationPanel
+          settings={settings}
+          optimizedParams={optimizedParams}
+          isOptimizing={isOptimizing}
+          error={optimizationError}
+          hasPriceData={!!priceData}
+          onSettingsChange={setSettings}
+          onOptimize={handleOptimize}
+          onApply={handleApplyOptimized}
+        />
 
         {result && result.trades.length > 0 && (
           <>

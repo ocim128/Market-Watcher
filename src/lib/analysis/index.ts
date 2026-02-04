@@ -8,6 +8,7 @@ export { calculateCorrelationVelocity } from './correlation-velocity'
 export { calculateVolatilityAdjustedSpread } from './volatility-spread'
 export { buildNotes } from './notes-builder'
 export { runBacktest, runBacktestAllPairs } from './backtest-engine'
+export { optimizeParameters, buildPriceData } from './walk-forward-optimization'
 
 export {
   mean,

@@ -18,6 +18,39 @@ export interface BacktestConfig {
   stopLossPercent: number
 }
 
+export interface PriceData {
+  primaryClose: number
+  secondaryClose: number
+  timestamp?: number
+}
+
+export interface WalkForwardWindowResult {
+  windowIndex: number
+  trainStart: number
+  trainEnd: number
+  testStart: number
+  testEnd: number
+  selectedConfig: BacktestConfig
+  trainScore: number
+  testScore: number
+  testSummary: BacktestSummary
+}
+
+export interface OptimizedParams {
+  config: BacktestConfig
+  confidence: 'high' | 'medium' | 'low'
+  windowsEvaluated: number
+  trainWindow: number
+  testWindow: number
+  forwardScore: number
+  walkForwardProfitPercent: number
+  walkForwardWinRate: number
+  walkForwardTrades: number
+  baselineProfitPercent: number
+  improvementPercent: number
+  windowResults: WalkForwardWindowResult[]
+}
+
 // Default backtest configuration
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   entrySpreadThreshold: 3,
