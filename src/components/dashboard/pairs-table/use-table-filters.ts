@@ -1,0 +1,81 @@
+/**
+ * Hook for managing table filters
+ */
+
+import { useState, useMemo } from 'react'
+import { DEFAULT_FILTER_OPTIONS } from '@/types'
+import type { PairAnalysisResult, FilterOptions } from '@/types'
+
+export interface UseTableFiltersResult {
+  filters: FilterOptions
+  setFilters: (filters: FilterOptions) => void
+  searchQuery: string
+  setSearchQuery: (query: string) => void
+  filteredData: PairAnalysisResult[]
+  resetFilters: () => void
+}
+
+/**
+ * Hook for filtering pair analysis data
+ */
+export function useTableFilters(analysisResults: PairAnalysisResult[]): UseTableFiltersResult {
+  const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTER_OPTIONS)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredData = useMemo(() => {
+    if (!analysisResults) {
+      return []
+    }
+
+    return analysisResults.filter(pair => {
+      // Search filter
+      if (searchQuery) {
+        const search = searchQuery.toLowerCase()
+        if (!pair.symbol.toLowerCase().includes(search)) {
+          return false
+        }
+      }
+
+      // Correlation filter
+      if (Math.abs(pair.correlation) < filters.minCorrelation) {
+        return false
+      }
+
+      // Z-Score filter
+      if (Math.abs(pair.spreadZScore) < filters.minZScore) {
+        return false
+      }
+
+      // Opportunity filter
+      if (pair.opportunityScore < filters.minOpportunity) {
+        return false
+      }
+
+      // Signal quality filter
+      if (!filters.signalQualities.includes(pair.volatilitySpread.signalQuality)) {
+        return false
+      }
+
+      // Regime filter
+      if (!filters.regimes.includes(pair.correlationVelocity.regime)) {
+        return false
+      }
+
+      return true
+    })
+  }, [analysisResults, filters, searchQuery])
+
+  const resetFilters = () => {
+    setFilters(DEFAULT_FILTER_OPTIONS)
+    setSearchQuery('')
+  }
+
+  return {
+    filters,
+    setFilters,
+    searchQuery,
+    setSearchQuery,
+    filteredData,
+    resetFilters,
+  }
+}
