@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { config } from '@/config'
 import { getTopUsdtPairs, fetchKlinesPaged, extractClosePrices } from '@/lib/binance'
 import { queryKeys } from './use-binance-data'
@@ -13,9 +13,42 @@ export interface ScanResult {
   closePrices: number[]
 }
 
-/**
- * Hook for scanning multiple pairs and caching results
- */
+async function fetchSymbolData(
+  symbol: string,
+  interval: string,
+  totalBars: number,
+  queryClient: QueryClient
+): Promise<ScanResult> {
+  const cached = queryClient.getQueryData<BinanceKline[]>(queryKeys.klines(symbol, interval))
+
+  if (cached && cached.length > 0) {
+    return { symbol, klines: cached, closePrices: extractClosePrices(cached) }
+  }
+
+  const klines = await fetchKlinesPaged(symbol, interval, totalBars, 1000, 0)
+  queryClient.setQueryData(queryKeys.klines(symbol, interval), klines)
+  return { symbol, klines, closePrices: extractClosePrices(klines) }
+}
+
+async function processBatch(
+  batch: string[],
+  interval: string,
+  totalBars: number,
+  queryClient: QueryClient,
+  scanResults: ScanResult[]
+): Promise<void> {
+  const batchPromises = batch.map(symbol =>
+    fetchSymbolData(symbol, interval, totalBars, queryClient)
+  )
+  const batchResults = await Promise.allSettled(batchPromises)
+
+  for (const result of batchResults) {
+    if (result.status === 'fulfilled' && result.value.klines.length > 0) {
+      scanResults.push(result.value)
+    }
+  }
+}
+
 export function usePairScan() {
   const queryClient = useQueryClient()
   const [progress, setProgress] = useState<ScanProgress>({
@@ -44,22 +77,12 @@ export function usePairScan() {
         includePrimary = true,
       } = options
 
-      setProgress({
-        current: 0,
-        total: 0,
-        currentSymbol: 'Fetching pairs...',
-        status: 'scanning',
-      })
+      setProgress({ current: 0, total: 0, currentSymbol: 'Fetching pairs...', status: 'scanning' })
       setResults([])
 
       try {
-        // Step 1: Get top pairs
         let pairs = await getTopUsdtPairs(limit)
-
-        // Exclude primary pair from the list (we'll fetch it separately)
         pairs = pairs.filter(p => p !== config.primaryPair)
-
-        // Add primary pair at the beginning if requested
         const allSymbols = includePrimary ? [config.primaryPair, ...pairs] : pairs
 
         setProgress({
@@ -71,44 +94,9 @@ export function usePairScan() {
 
         const scanResults: ScanResult[] = []
 
-        // Step 2: Fetch klines for each symbol with concurrency
         for (let i = 0; i < allSymbols.length; i += concurrency) {
           const batch = allSymbols.slice(i, i + concurrency)
-
-          const batchPromises = batch.map(async symbol => {
-            // Check cache first
-            const cached = queryClient.getQueryData<BinanceKline[]>(
-              queryKeys.klines(symbol, interval)
-            )
-
-            if (cached && cached.length > 0) {
-              return {
-                symbol,
-                klines: cached,
-                closePrices: extractClosePrices(cached),
-              }
-            }
-
-            // Fetch from API
-            const klines = await fetchKlinesPaged(symbol, interval, totalBars, 1000, 0)
-
-            // Cache the result
-            queryClient.setQueryData(queryKeys.klines(symbol, interval), klines)
-
-            return {
-              symbol,
-              klines,
-              closePrices: extractClosePrices(klines),
-            }
-          })
-
-          const batchResults = await Promise.allSettled(batchPromises)
-
-          for (const result of batchResults) {
-            if (result.status === 'fulfilled' && result.value.klines.length > 0) {
-              scanResults.push(result.value)
-            }
-          }
+          await processBatch(batch, interval, totalBars, queryClient, scanResults)
 
           const completed = Math.min(i + concurrency, allSymbols.length)
           setProgress({
@@ -118,7 +106,6 @@ export function usePairScan() {
             status: 'scanning',
           })
 
-          // Small delay between batches to avoid rate limiting
           if (i + concurrency < allSymbols.length) {
             await new Promise(resolve => setTimeout(resolve, config.scanDelayMs))
           }
@@ -131,15 +118,10 @@ export function usePairScan() {
           currentSymbol: '',
           status: 'complete',
         })
-
         return scanResults
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        setProgress(prev => ({
-          ...prev,
-          status: 'error',
-          error: errorMessage,
-        }))
+        setProgress(prev => ({ ...prev, status: 'error', error: errorMessage }))
         throw error
       }
     },
@@ -147,12 +129,7 @@ export function usePairScan() {
   )
 
   const reset = useCallback(() => {
-    setProgress({
-      current: 0,
-      total: 0,
-      currentSymbol: '',
-      status: 'idle',
-    })
+    setProgress({ current: 0, total: 0, currentSymbol: '', status: 'idle' })
     setResults([])
   }, [])
 

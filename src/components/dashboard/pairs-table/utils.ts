@@ -137,3 +137,51 @@ export function getOpportunityScoreBarClass(score: number): string {
   }
   return 'bg-muted-foreground'
 }
+
+/**
+ * Get CSS class for confluence rating badge (Feature #1)
+ */
+export function getConfluenceBadgeClass(rating: number): string {
+  switch (rating) {
+    case 3:
+      return 'bg-emerald-400/10 text-emerald-400 border-emerald-400/30 shadow-[0_0_12px_rgba(52,211,153,0.15)] font-semibold'
+    case 2:
+      return 'bg-amber-400/10 text-amber-400 border-amber-400/20 font-medium'
+    case 1:
+      return 'bg-slate-400/10 text-slate-400 border-slate-400/20'
+    default:
+      return 'bg-slate-500/5 text-slate-500 border-slate-500/20'
+  }
+}
+
+/**
+ * Get color class for confluence rating text
+ */
+export function getConfluenceColorClass(rating: number): string {
+  switch (rating) {
+    case 3:
+      return 'text-emerald-400'
+    case 2:
+      return 'text-amber-400'
+    case 1:
+      return 'text-slate-400'
+    default:
+      return 'text-slate-500'
+  }
+}
+
+/**
+ * Get display label for confluence rating
+ */
+export function getConfluenceLabel(rating: number): string {
+  switch (rating) {
+    case 3:
+      return 'Strong'
+    case 2:
+      return 'Moderate'
+    case 1:
+      return 'Weak'
+    default:
+      return 'None'
+  }
+}

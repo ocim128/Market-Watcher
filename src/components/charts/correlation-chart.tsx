@@ -14,6 +14,59 @@ interface CorrelationChartProps {
   }
 }
 
+const CHART_COLORS = {
+  background: 'transparent',
+  text: '#9ca3af',
+  grid: 'rgba(255, 255, 255, 0.05)',
+  crosshair: 'rgba(255, 255, 255, 0.2)',
+  line: '#22c55e',
+} as const
+
+function createChartConfig(width: number, height: number) {
+  return {
+    layout: {
+      background: { type: ColorType.Solid, color: CHART_COLORS.background },
+      textColor: CHART_COLORS.text,
+    },
+    grid: {
+      vertLines: { color: CHART_COLORS.grid },
+      horzLines: { color: CHART_COLORS.grid },
+    },
+    crosshair: {
+      mode: CrosshairMode.Magnet,
+      vertLine: { color: CHART_COLORS.crosshair },
+      horzLine: { color: CHART_COLORS.crosshair },
+    },
+    width,
+    height,
+    rightPriceScale: {
+      borderVisible: false,
+      scaleMargins: { top: 0.1, bottom: 0.1 },
+    },
+    timeScale: { borderVisible: false, timeVisible: true },
+  }
+}
+
+function initCorrelationChart(
+  container: HTMLDivElement | null,
+  height: number,
+  seriesRef: React.MutableRefObject<ISeriesApi<'Line'> | null>
+) {
+  if (!container) {
+    return null
+  }
+
+  const chart = createChart(container, createChartConfig(container.clientWidth, height))
+  seriesRef.current = chart.addSeries(LineSeries, {
+    color: CHART_COLORS.line,
+    lineWidth: 2,
+    priceLineVisible: true,
+    lastValueVisible: true,
+  })
+  chart.applyOptions({ rightPriceScale: { autoScale: true } })
+  return chart
+}
+
 export function CorrelationChart({
   correlations,
   timestamps,
@@ -25,62 +78,8 @@ export function CorrelationChart({
   const seriesRef = useRef<ISeriesApi<'Line'> | null>(null)
 
   const initChart = useCallback(() => {
-    if (!chartContainerRef.current) {
-      return
-    }
-
-    if (chartRef.current) {
-      chartRef.current.remove()
-      chartRef.current = null
-    }
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#9ca3af',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
-      },
-      crosshair: {
-        mode: CrosshairMode.Magnet,
-        vertLine: { color: 'rgba(255, 255, 255, 0.2)' },
-        horzLine: { color: 'rgba(255, 255, 255, 0.2)' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height,
-      rightPriceScale: {
-        borderVisible: false,
-        scaleMargins: {
-          top: 0.1,
-          bottom: 0.1,
-        },
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-      },
-    })
-
-    chartRef.current = chart
-
-    // Main correlation line
-    seriesRef.current = chart.addSeries(LineSeries, {
-      color: '#22c55e',
-      lineWidth: 2,
-      priceLineVisible: true,
-      lastValueVisible: true,
-    })
-
-    // Add horizontal lines for thresholds
-    chart.applyOptions({
-      rightPriceScale: {
-        autoScale: true,
-      },
-    })
-
-    return chart
+    chartRef.current = initCorrelationChart(chartContainerRef.current, height, seriesRef)
+    return chartRef.current
   }, [height])
 
   useEffect(() => {
@@ -94,22 +93,23 @@ export function CorrelationChart({
     }
   }, [initChart])
 
-  useEffect(() => {
-    if (!seriesRef.current || correlations.length === 0) {
-      return
-    }
-
+  function createCorrelationData(correlations: number[], timestamps?: number[]): LineData[] {
     const now = Date.now()
     const hourMs = 60 * 60 * 1000
 
-    const data: LineData[] = correlations.map((value, i) => ({
+    return correlations.map((value, i) => ({
       time: (timestamps
         ? timestamps[i] / 1000
         : (now - (correlations.length - i) * hourMs) / 1000) as Time,
       value,
     }))
+  }
 
-    seriesRef.current.setData(data)
+  useEffect(() => {
+    if (!seriesRef.current || correlations.length === 0) {
+      return
+    }
+    seriesRef.current.setData(createCorrelationData(correlations, timestamps))
     chartRef.current?.timeScale().fitContent()
   }, [correlations, timestamps])
 

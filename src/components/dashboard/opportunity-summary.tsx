@@ -80,12 +80,10 @@ function SummaryCard({
   )
 }
 
-export function OpportunitySummary() {
+function useOpportunitySummary() {
   const { analysisResults, isScanning, isAnalyzing, isComplete } = useScan()
-
   const isLoading = isScanning || isAnalyzing
 
-  // Calculate summary stats from analysis results
   const stats = useMemo(() => {
     if (!analysisResults || analysisResults.length === 0) {
       return {
@@ -100,14 +98,10 @@ export function OpportunitySummary() {
     const premiumCount = analysisResults.filter(
       r => r.volatilitySpread.signalQuality === 'premium'
     ).length
-
     const strongCorrCount = analysisResults.filter(r => Math.abs(r.correlation) >= 0.7).length
-
     const extremeZCount = analysisResults.filter(r => Math.abs(r.spreadZScore) >= 2).length
-
     const avgOpportunity =
       analysisResults.reduce((sum, r) => sum + r.opportunityScore, 0) / analysisResults.length
-
     const topResult = analysisResults.reduce((best, r) =>
       r.opportunityScore > (best?.opportunityScore ?? 0) ? r : best
     )
@@ -123,20 +117,24 @@ export function OpportunitySummary() {
     }
   }, [analysisResults])
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  }
+  return { stats, isLoading, isComplete, analysisResults }
+}
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-  }
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 },
+  },
+}
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+}
+
+export function OpportunitySummary() {
+  const { stats, isLoading, isComplete, analysisResults } = useOpportunitySummary()
 
   return (
     <motion.div

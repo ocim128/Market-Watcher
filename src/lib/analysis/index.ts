@@ -20,3 +20,13 @@ export {
 } from './statistics'
 
 export { analyzeMultiTimeframeConfluence } from './multi-timeframe'
+
+// Multi-method confluence filter (Feature #1)
+export {
+  calculateConfluence,
+  getConfluenceRatingColorClass,
+  getConfluenceBadgeClass,
+  filterByConfluence,
+  sortByConfluence,
+} from './confluence-filter'
+export type { ConfluenceIndicator, ConfluenceAnalysis } from './confluence-filter'

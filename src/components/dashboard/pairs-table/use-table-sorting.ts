@@ -1,3 +1,4 @@
+'use client'
 /**
  * Hook for managing table sorting
  */
@@ -12,6 +13,7 @@ export type SortKey =
   | 'spreadZScore'
   | 'opportunityScore'
   | 'signalQuality'
+  | 'confluence'
 
 export type SortOrder = 'asc' | 'desc'
 
@@ -60,6 +62,10 @@ export function useTableSorting(filteredData: PairAnalysisResult[]): UseTableSor
         case 'signalQuality':
           aVal = signalQualityOrder[a.volatilitySpread.signalQuality as SignalQuality]
           bVal = signalQualityOrder[b.volatilitySpread.signalQuality as SignalQuality]
+          break
+        case 'confluence':
+          aVal = a.confluence.rating
+          bVal = b.confluence.rating
           break
         default:
           aVal = a.opportunityScore

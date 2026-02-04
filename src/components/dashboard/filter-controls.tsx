@@ -1,6 +1,7 @@
+/* eslint-disable max-lines */
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,23 +51,25 @@ function getRegimeLabel(regime: CorrelationRegime) {
   return labels[regime]
 }
 
-export function FilterControls({
-  filters,
-  onFiltersChange,
-  searchQuery,
-  onSearchChange,
-}: FilterControlsProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const hasActiveFilters = useMemo(() => {
+function useHasActiveFilters(filters: FilterOptions): boolean {
+  return useMemo(() => {
     return (
       filters.minCorrelation > 0 ||
       filters.minZScore > 0 ||
       filters.minOpportunity > 0 ||
+      filters.minConfluence > 0 ||
       filters.signalQualities.length < SIGNAL_QUALITIES.length ||
       filters.regimes.length < REGIMES.length
     )
   }, [filters])
+}
+
+function useFilterControlsState(
+  filters: FilterOptions,
+  onFiltersChange: (f: FilterOptions) => void
+) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const hasActiveFilters = useHasActiveFilters(filters)
 
   const toggleSignalQuality = (quality: SignalQuality) => {
     const isSelected = filters.signalQualities.includes(quality)
@@ -84,6 +87,180 @@ export function FilterControls({
     onFiltersChange({ ...filters, regimes: newRegimes })
   }
 
+  return { isExpanded, setIsExpanded, hasActiveFilters, toggleSignalQuality, toggleRegime }
+}
+
+interface FilterSliderProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  format: (v: number) => string
+  onChange: (value: number) => void
+}
+
+function FilterSlider({ label, value, min, max, step, format, onChange }: FilterSliderProps) {
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground block mb-1">
+        {label}: {format(value)}
+      </label>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        className="w-full"
+      />
+    </div>
+  )
+}
+
+function ThresholdFilters({
+  filters,
+  onFiltersChange,
+}: {
+  filters: FilterOptions
+  onFiltersChange: (f: FilterOptions) => void
+}) {
+  const sliders = [
+    {
+      label: 'Min Correlation',
+      value: filters.minCorrelation,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      format: (v: number) => v.toFixed(2),
+      onChange: (v: number) => onFiltersChange({ ...filters, minCorrelation: v }),
+    },
+    {
+      label: 'Min Z-Score',
+      value: filters.minZScore,
+      min: 0,
+      max: 3,
+      step: 0.25,
+      format: (v: number) => `${v.toFixed(1)}σ`,
+      onChange: (v: number) => onFiltersChange({ ...filters, minZScore: v }),
+    },
+    {
+      label: 'Min Opportunity',
+      value: filters.minOpportunity,
+      min: 0,
+      max: 100,
+      step: 5,
+      format: (v: number) => `${v}%`,
+      onChange: (v: number) => onFiltersChange({ ...filters, minOpportunity: v }),
+    },
+    {
+      label: 'Min Confluence',
+      value: filters.minConfluence,
+      min: 0,
+      max: 3,
+      step: 1,
+      format: (v: number) => `${v}/3`,
+      onChange: (v: number) => onFiltersChange({ ...filters, minConfluence: v }),
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {sliders.map(s => (
+        <FilterSlider key={s.label} {...s} />
+      ))}
+    </div>
+  )
+}
+
+function SignalQualityFilter({
+  filters,
+  onToggle,
+}: {
+  filters: FilterOptions
+  onToggle: (quality: SignalQuality) => void
+}) {
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground block mb-2">Signal Quality</label>
+      <div className="flex flex-wrap gap-2">
+        {SIGNAL_QUALITIES.map(quality => (
+          <button
+            key={quality}
+            onClick={() => onToggle(quality)}
+            className={`px-3 py-1 rounded-full text-xs transition-colors ${
+              filters.signalQualities.includes(quality)
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {getSignalLabel(quality)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RegimeFilter({
+  filters,
+  onToggle,
+}: {
+  filters: FilterOptions
+  onToggle: (regime: CorrelationRegime) => void
+}) {
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground block mb-2">Correlation Regime</label>
+      <div className="flex flex-wrap gap-2">
+        {REGIMES.map(regime => (
+          <button
+            key={regime}
+            onClick={() => onToggle(regime)}
+            className={`px-3 py-1 rounded-full text-xs transition-colors ${
+              filters.regimes.includes(regime)
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {getRegimeLabel(regime)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SearchInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="relative flex-1">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <input
+        type="text"
+        placeholder="Search pairs..."
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full pl-9 pr-4 py-2 bg-secondary/50 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+      {value && (
+        <button onClick={() => onChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+          <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function FilterControls({
+  filters,
+  onFiltersChange,
+  searchQuery,
+  onSearchChange,
+}: FilterControlsProps) {
+  const { isExpanded, setIsExpanded, hasActiveFilters, toggleSignalQuality, toggleRegime } =
+    useFilterControlsState(filters, onFiltersChange)
+
   const resetFilters = () => {
     onFiltersChange(DEFAULT_FILTER_OPTIONS)
     onSearchChange('')
@@ -93,24 +270,7 @@ export function FilterControls({
     <div className="space-y-3">
       {/* Search and toggle */}
       <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search pairs..."
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-secondary/50 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-            >
-              <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-            </button>
-          )}
-        </div>
+        <SearchInput value={searchQuery} onChange={onSearchChange} />
 
         <Button
           variant={isExpanded ? 'secondary' : 'outline'}
@@ -134,100 +294,11 @@ export function FilterControls({
         )}
       </div>
 
-      {/* Expanded filters */}
       {isExpanded && (
         <div className="p-4 bg-secondary/30 rounded-lg space-y-4">
-          {/* Thresholds */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">
-                Min Correlation: {filters.minCorrelation.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={filters.minCorrelation}
-                onChange={e =>
-                  onFiltersChange({ ...filters, minCorrelation: parseFloat(e.target.value) })
-                }
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">
-                Min Z-Score: {filters.minZScore.toFixed(1)}σ
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="3"
-                step="0.25"
-                value={filters.minZScore}
-                onChange={e =>
-                  onFiltersChange({ ...filters, minZScore: parseFloat(e.target.value) })
-                }
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">
-                Min Opportunity: {filters.minOpportunity}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={filters.minOpportunity}
-                onChange={e =>
-                  onFiltersChange({ ...filters, minOpportunity: parseFloat(e.target.value) })
-                }
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          {/* Signal Quality */}
-          <div>
-            <label className="text-sm text-muted-foreground block mb-2">Signal Quality</label>
-            <div className="flex flex-wrap gap-2">
-              {SIGNAL_QUALITIES.map(quality => (
-                <button
-                  key={quality}
-                  onClick={() => toggleSignalQuality(quality)}
-                  className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                    filters.signalQualities.includes(quality)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {getSignalLabel(quality)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Regimes */}
-          <div>
-            <label className="text-sm text-muted-foreground block mb-2">Correlation Regime</label>
-            <div className="flex flex-wrap gap-2">
-              {REGIMES.map(regime => (
-                <button
-                  key={regime}
-                  onClick={() => toggleRegime(regime)}
-                  className={`px-3 py-1 rounded-full text-xs transition-colors ${
-                    filters.regimes.includes(regime)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {getRegimeLabel(regime)}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ThresholdFilters filters={filters} onFiltersChange={onFiltersChange} />
+          <SignalQualityFilter filters={filters} onToggle={toggleSignalQuality} />
+          <RegimeFilter filters={filters} onToggle={toggleRegime} />
         </div>
       )}
     </div>

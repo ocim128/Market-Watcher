@@ -69,17 +69,84 @@ export async function fetchKlines(
   return data.map(parseKline)
 }
 
-/**
- * Fetch klines with pagination to exceed the 1000 bar limit
- * Ports logic from .NET BinanceClient.FetchKlinesPaged
- *
- * @param symbol - Trading pair symbol
- * @param interval - Kline interval
- * @param totalBars - Total number of bars to fetch
- * @param batchSize - Bars per request (max 1000)
- * @param delayMs - Delay between requests to avoid rate limiting
- * @param onProgress - Optional progress callback
- */
+async function fetchKlinesChunk(
+  symbol: string,
+  interval: string,
+  limit: number,
+  endTime: number | undefined
+): Promise<{ chunk: BinanceKline[]; firstOpenTime: number | null }> {
+  const chunk = await fetchKlines(symbol, interval, limit, endTime)
+  if (chunk.length === 0) {
+    return { chunk: [], firstOpenTime: null }
+  }
+  return { chunk, firstOpenTime: chunk[0]?.openTime ?? null }
+}
+
+interface FetchState {
+  remaining: number
+  endTime: number | undefined
+  chunks: BinanceKline[][]
+  fetched: number
+}
+
+function createFetchState(totalBars: number): FetchState {
+  const remaining = Math.max(0, totalBars)
+  return {
+    remaining,
+    endTime: undefined,
+    chunks: [],
+    fetched: 0,
+  }
+}
+
+function shouldContinueFetching(state: FetchState): boolean {
+  return state.remaining > 0
+}
+
+async function fetchNextBatch(
+  symbol: string,
+  interval: string,
+  batchSize: number,
+  state: FetchState,
+  onProgress?: (fetched: number, total: number) => void
+): Promise<boolean> {
+  const requestLimit = Math.min(batchSize, state.remaining)
+
+  try {
+    const { chunk, firstOpenTime } = await fetchKlinesChunk(
+      symbol,
+      interval,
+      requestLimit,
+      state.endTime
+    )
+
+    if (chunk.length === 0) {
+      console.info(`No more klines returned for ${symbol}`)
+      return false
+    }
+
+    state.chunks.push(chunk)
+    state.fetched += chunk.length
+    state.remaining -= chunk.length
+    onProgress?.(state.fetched, state.fetched + state.remaining)
+
+    if (state.remaining <= 0) {
+      return false
+    }
+
+    if (firstOpenTime && firstOpenTime > 0) {
+      state.endTime = firstOpenTime - 1
+    } else {
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error(`Failed to fetch klines for ${symbol}:`, error)
+    return false
+  }
+}
+
 export async function fetchKlinesPaged(
   symbol: string,
   interval: string,
@@ -93,62 +160,29 @@ export async function fetchKlinesPaged(
     return []
   }
 
-  let remaining = Math.max(0, totalBars)
-  if (remaining === 0) {
+  const state = createFetchState(totalBars)
+  if (state.remaining === 0) {
     return []
   }
 
   const limit = Math.min(Math.max(1, batchSize), 1000)
-  let endTime: number | undefined = undefined
-  const chunks: BinanceKline[][] = []
-  let fetched = 0
 
-  while (remaining > 0) {
-    const requestLimit = Math.min(limit, remaining)
-
-    try {
-      const chunk = await fetchKlines(symbol, interval, requestLimit, endTime)
-
-      if (chunk.length === 0) {
-        console.info(`No more klines returned for ${symbol}`)
-        break
-      }
-
-      chunks.push(chunk)
-      fetched += chunk.length
-      remaining -= chunk.length
-
-      onProgress?.(fetched, totalBars)
-
-      if (remaining <= 0) {
-        break
-      }
-
-      // Set endTime to before the first candle of this chunk for next request
-      const firstOpenTime = chunk[0]?.openTime
-      if (firstOpenTime && firstOpenTime > 0) {
-        endTime = firstOpenTime - 1
-      } else {
-        break
-      }
-
-      // Rate limiting delay
-      if (delayMs > 0 && remaining > 0) {
-        await new Promise(resolve => setTimeout(resolve, delayMs))
-      }
-    } catch (error) {
-      console.error(`Failed to fetch klines for ${symbol}:`, error)
+  while (shouldContinueFetching(state)) {
+    const shouldContinue = await fetchNextBatch(symbol, interval, limit, state, onProgress)
+    if (!shouldContinue) {
       break
+    }
+
+    if (delayMs > 0 && state.remaining > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }
 
-  if (chunks.length === 0) {
+  if (state.chunks.length === 0) {
     return []
   }
-
-  // Reverse chunks (we fetched backwards in time) and flatten
-  chunks.reverse()
-  return chunks.flat()
+  state.chunks.reverse()
+  return state.chunks.flat()
 }
 
 /**

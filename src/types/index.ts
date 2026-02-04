@@ -25,6 +25,9 @@ export interface PairAnalysisResult {
   // Correlation dynamics
   correlationVelocity: CorrelationVelocityResult
 
+  // Multi-method confluence (Feature #1)
+  confluence: ConfluenceAnalysis
+
   // Notes from analysis
   notes: string[]
 }
@@ -45,6 +48,35 @@ export interface CorrelationVelocityResult {
   velocity: number
   acceleration: number
   regime: CorrelationRegime
+}
+
+// ============================================================================
+// Multi-Method Confluence Types (Feature #1: Advanced Signal Detection)
+// ============================================================================
+
+export interface ConfluenceIndicator {
+  name: string
+  active: boolean
+  value: string
+}
+
+export interface ConfluenceAnalysis {
+  /** Confluence Rating (0-3): Number of indicators that agree */
+  rating: number
+  /** Human-readable rating label */
+  ratingLabel: string
+  /** Individual indicator states */
+  indicators: {
+    zScoreExtreme: boolean
+    correlationStrengthening: boolean
+    signalQualityStrong: boolean
+  }
+  /** Detailed indicator info for display */
+  indicatorDetails: ConfluenceIndicator[]
+  /** Whether this pair meets the minimum threshold (rating >= 2) */
+  meetsThreshold: boolean
+  /** Signal direction based on Z-score */
+  direction: 'long_spread' | 'short_spread' | 'neutral'
 }
 
 export type SignalQuality =
@@ -116,6 +148,7 @@ export interface FilterOptions {
   maxCorrelation: number
   minZScore: number
   minOpportunity: number
+  minConfluence: number
   signalQualities: SignalQuality[]
   regimes: CorrelationRegime[]
 }
@@ -125,6 +158,7 @@ export const DEFAULT_FILTER_OPTIONS: FilterOptions = {
   maxCorrelation: 1,
   minZScore: 0,
   minOpportunity: 0,
+  minConfluence: 0,
   signalQualities: ['premium', 'strong', 'moderate', 'weak', 'noisy'],
   regimes: [
     'stable_strong',

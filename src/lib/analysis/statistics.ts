@@ -131,6 +131,34 @@ export function calculateRatio(primary: number[], secondary: number[]): number[]
 }
 
 /**
+ * Align two series by dropping entries where either value is not finite
+ * Returns aligned arrays and count of dropped entries
+ */
+export function alignSeries(
+  primary: number[],
+  secondary: number[]
+): { primary: number[]; secondary: number[]; droppedCount: number } {
+  const length = Math.min(primary.length, secondary.length)
+  const alignedPrimary: number[] = []
+  const alignedSecondary: number[] = []
+  let droppedCount = 0
+
+  for (let i = 0; i < length; i++) {
+    const p = primary[i]
+    const s = secondary[i]
+    // Skip if either value is not finite (NaN, Infinity, etc.)
+    if (!Number.isFinite(p) || !Number.isFinite(s)) {
+      droppedCount++
+      continue
+    }
+    alignedPrimary.push(p)
+    alignedSecondary.push(s)
+  }
+
+  return { primary: alignedPrimary, secondary: alignedSecondary, droppedCount }
+}
+
+/**
  * Calculate Z-score of the current spread value
  */
 export function calculateZScore(spread: number[]): {

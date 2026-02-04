@@ -12,96 +12,114 @@ interface SpreadChartProps {
   height?: number
 }
 
+// Chart configuration constants
+const CHART_COLORS = {
+  background: 'transparent',
+  text: '#9ca3af',
+  grid: 'rgba(255, 255, 255, 0.05)',
+  crosshair: 'rgba(255, 255, 255, 0.2)',
+  upperBand: 'rgba(239, 68, 68, 0.5)',
+  lowerBand: 'rgba(34, 197, 94, 0.5)',
+  mean: 'rgba(156, 163, 175, 0.5)',
+  spread: '#a855f7',
+} as const
+
+const BAND_OPTIONS = {
+  lineWidth: 1,
+  lineStyle: LineStyle.Dashed,
+  priceLineVisible: false,
+  lastValueVisible: false,
+} as const
+
+function createChartOptions(width: number, height: number) {
+  return {
+    layout: {
+      background: { type: ColorType.Solid, color: CHART_COLORS.background },
+      textColor: CHART_COLORS.text,
+    },
+    grid: {
+      vertLines: { color: CHART_COLORS.grid },
+      horzLines: { color: CHART_COLORS.grid },
+    },
+    crosshair: {
+      mode: CrosshairMode.Magnet,
+      vertLine: { color: CHART_COLORS.crosshair },
+      horzLine: { color: CHART_COLORS.crosshair },
+    },
+    width,
+    height,
+    rightPriceScale: { borderVisible: false },
+    timeScale: { borderVisible: false, timeVisible: true },
+    handleScale: { mouseWheel: true, pinch: true },
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: false,
+    },
+  }
+}
+
+function addChartSeries(chart: IChartApi) {
+  const upperBand = chart.addSeries(LineSeries, {
+    ...BAND_OPTIONS,
+    color: CHART_COLORS.upperBand,
+  })
+
+  const lowerBand = chart.addSeries(LineSeries, {
+    ...BAND_OPTIONS,
+    color: CHART_COLORS.lowerBand,
+  })
+
+  const meanSeries = chart.addSeries(LineSeries, {
+    ...BAND_OPTIONS,
+    color: CHART_COLORS.mean,
+    lineStyle: LineStyle.Dotted,
+  })
+
+  const spreadSeries = chart.addSeries(LineSeries, {
+    color: CHART_COLORS.spread,
+    lineWidth: 2,
+    priceLineVisible: true,
+    lastValueVisible: true,
+  })
+
+  return { upperBand, lowerBand, meanSeries, spreadSeries }
+}
+
 export function SpreadChart({ spread, mean, std, timestamps, height = 200 }: SpreadChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const spreadSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
-  const meanSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
-  const upperBandRef = useRef<ISeriesApi<'Line'> | null>(null)
-  const lowerBandRef = useRef<ISeriesApi<'Line'> | null>(null)
+  const seriesRef = useRef<{
+    spread: ISeriesApi<'Line'> | null
+    mean: ISeriesApi<'Line'> | null
+    upper: ISeriesApi<'Line'> | null
+    lower: ISeriesApi<'Line'> | null
+  }>({ spread: null, mean: null, upper: null, lower: null })
 
   const initChart = useCallback(() => {
     if (!chartContainerRef.current) {
       return
     }
 
-    // Clean up existing chart
     if (chartRef.current) {
       chartRef.current.remove()
       chartRef.current = null
     }
 
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#9ca3af',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
-      },
-      crosshair: {
-        mode: CrosshairMode.Magnet,
-        vertLine: { color: 'rgba(255, 255, 255, 0.2)' },
-        horzLine: { color: 'rgba(255, 255, 255, 0.2)' },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height,
-      rightPriceScale: {
-        borderVisible: false,
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-      },
-      handleScale: {
-        mouseWheel: true,
-        pinch: true,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: false,
-      },
-    })
+    const chart = createChart(
+      chartContainerRef.current,
+      createChartOptions(chartContainerRef.current.clientWidth, height)
+    )
 
     chartRef.current = chart
-
-    // Upper band (+2σ)
-    upperBandRef.current = chart.addSeries(LineSeries, {
-      color: 'rgba(239, 68, 68, 0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    })
-
-    // Lower band (-2σ)
-    lowerBandRef.current = chart.addSeries(LineSeries, {
-      color: 'rgba(34, 197, 94, 0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    })
-
-    // Mean line
-    meanSeriesRef.current = chart.addSeries(LineSeries, {
-      color: 'rgba(156, 163, 175, 0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    })
-
-    // Spread line
-    spreadSeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#a855f7',
-      lineWidth: 2,
-      priceLineVisible: true,
-      lastValueVisible: true,
-    })
+    const series = addChartSeries(chart)
+    seriesRef.current = {
+      spread: series.spreadSeries,
+      mean: series.meanSeries,
+      upper: series.upperBand,
+      lower: series.lowerBand,
+    }
 
     return chart
   }, [height])
@@ -120,46 +138,26 @@ export function SpreadChart({ spread, mean, std, timestamps, height = 200 }: Spr
 
   // Update data
   useEffect(() => {
-    if (!spreadSeriesRef.current || !meanSeriesRef.current || spread.length === 0) {
+    if (!seriesRef.current.spread || !seriesRef.current.mean || spread.length === 0) {
       return
     }
 
     const now = Date.now()
     const hourMs = 60 * 60 * 1000
 
-    const spreadData: LineData[] = spread.map((value, i) => ({
-      time: (timestamps
-        ? timestamps[i] / 1000
-        : (now - (spread.length - i) * hourMs) / 1000) as Time,
-      value,
-    }))
+    const createLineDataWithTime = (values: number[], constantValue?: number): LineData[] => {
+      return values.map((value, i) => ({
+        time: (timestamps
+          ? timestamps[i] / 1000
+          : (now - (values.length - i) * hourMs) / 1000) as Time,
+        value: constantValue !== undefined ? constantValue : value,
+      }))
+    }
 
-    const meanData: LineData[] = spread.map((_, i) => ({
-      time: (timestamps
-        ? timestamps[i] / 1000
-        : (now - (spread.length - i) * hourMs) / 1000) as Time,
-      value: mean,
-    }))
-
-    const upperData: LineData[] = spread.map((_, i) => ({
-      time: (timestamps
-        ? timestamps[i] / 1000
-        : (now - (spread.length - i) * hourMs) / 1000) as Time,
-      value: mean + 2 * std,
-    }))
-
-    const lowerData: LineData[] = spread.map((_, i) => ({
-      time: (timestamps
-        ? timestamps[i] / 1000
-        : (now - (spread.length - i) * hourMs) / 1000) as Time,
-      value: mean - 2 * std,
-    }))
-
-    spreadSeriesRef.current.setData(spreadData)
-    meanSeriesRef.current?.setData(meanData)
-    upperBandRef.current?.setData(upperData)
-    lowerBandRef.current?.setData(lowerData)
-
+    seriesRef.current.spread.setData(createLineDataWithTime(spread))
+    seriesRef.current.mean.setData(createLineDataWithTime(spread, mean))
+    seriesRef.current.upper?.setData(createLineDataWithTime(spread, mean + 2 * std))
+    seriesRef.current.lower?.setData(createLineDataWithTime(spread, mean - 2 * std))
     chartRef.current?.timeScale().fitContent()
   }, [spread, mean, std, timestamps])
 

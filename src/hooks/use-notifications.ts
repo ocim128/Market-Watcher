@@ -8,9 +8,39 @@ interface UseNotificationsOptions {
   soundEnabled?: boolean
 }
 
-/**
- * Hook for browser notifications when premium signals are detected
- */
+const AUDIO_BASE64 =
+  'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVYvMGqe1/CjYiMyThyHvF5hgWcsXoV3fXN2dnOAgHt0cmNqaGlxfHl6gIB8fHx4foGCgHx6fHx+goKBf4CAgIGCgoKCgYGBgYGBgoKCgoKCgoGCgoKCgoKCgoKC'
+const NOTIFICATION_COOLDOWN = 300000 // 5 minutes
+
+function shouldNotify(pair: PairAnalysisResult, lastNotified: Set<string>): string | null {
+  if (pair.confluence.rating < 2) {
+    return null
+  }
+  const notifyKey = `${pair.symbol}-${Math.floor(Date.now() / NOTIFICATION_COOLDOWN)}`
+  if (lastNotified.has(notifyKey)) {
+    return null
+  }
+  return notifyKey
+}
+
+function createNotification(pair: PairAnalysisResult): Notification {
+  const notification = new Notification(
+    `💎 Premium Signal (Confluence ${pair.confluence.rating}/3)`,
+    {
+      body: `${pair.symbol.replace('USDT', '')}/USDT: Z-Score ${pair.spreadZScore.toFixed(2)}σ, Correlation ${pair.correlation.toFixed(2)}`,
+      icon: '/favicon.ico',
+      tag: pair.symbol,
+      requireInteraction: false,
+    }
+  )
+
+  notification.onclick = () => {
+    window.focus()
+    notification.close()
+  }
+  return notification
+}
+
 export function useNotifications({
   enabled = true,
   soundEnabled = true,
@@ -21,13 +51,11 @@ export function useNotifications({
   const lastNotifiedRef = useRef<Set<string>>(new Set())
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Request notification permission
   const requestPermission = useCallback(async () => {
     if (!('Notification' in window)) {
       console.warn('This browser does not support notifications')
       return false
     }
-
     try {
       const result = await Notification.requestPermission()
       setPermission(result)
@@ -38,69 +66,42 @@ export function useNotifications({
     }
   }, [])
 
-  // Check permission on mount
   useEffect(() => {
     if ('Notification' in window) {
       setPermission(Notification.permission)
     }
   }, [])
 
-  // Create audio element for notification sound
   useEffect(() => {
-    // Using a simple beep sound (base64 encoded)
-    audioRef.current = new Audio(
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleVYvMGqe1/CjYiMyThyHvF5hgWcsXoV3fXN2dnOAgHt0cmNqaGlxfHl6gIB8fHx4foGCgHx6fHx+goKBf4CAgIGCgoKCgYGBgYGBgoKCgoKCgoGCgoKCgoKCgoKC'
-    )
+    audioRef.current = new Audio(AUDIO_BASE64)
     audioRef.current.volume = 0.5
   }, [])
 
-  // Show notification for premium signals
   const notifyPremiumSignal = useCallback(
     (pair: PairAnalysisResult) => {
-      if (!isEnabled) {
-        return
-      }
-      if (permission !== 'granted') {
+      if (!isEnabled || permission !== 'granted') {
         return
       }
 
-      // Check if we already notified for this pair recently
-      const notifyKey = `${pair.symbol}-${Math.floor(Date.now() / 300000)}` // 5 min window
-      if (lastNotifiedRef.current.has(notifyKey)) {
+      const notifyKey = shouldNotify(pair, lastNotifiedRef.current)
+      if (!notifyKey) {
         return
       }
 
       lastNotifiedRef.current.add(notifyKey)
+      createNotification(pair)
 
-      // Create notification
-      const notification = new Notification('💎 Premium Signal Detected!', {
-        body: `${pair.symbol.replace('USDT', '')}/USDT: Z-Score ${pair.spreadZScore.toFixed(2)}σ, Correlation ${pair.correlation.toFixed(2)}`,
-        icon: '/favicon.ico',
-        tag: pair.symbol,
-        requireInteraction: false,
-      })
-
-      notification.onclick = () => {
-        window.focus()
-        notification.close()
-      }
-
-      // Play sound
       if (isSoundEnabled && audioRef.current) {
         audioRef.current.play().catch(() => {
-          // Ignore autoplay errors
+          /* Ignore autoplay errors */
         })
       }
 
-      // Clean up old notifications after 5 minutes
-      setTimeout(() => {
-        lastNotifiedRef.current.delete(notifyKey)
-      }, 300000)
+      setTimeout(() => lastNotifiedRef.current.delete(notifyKey), NOTIFICATION_COOLDOWN)
     },
     [isEnabled, permission, isSoundEnabled]
   )
 
-  // Check analysis results for new premium signals
   const checkForPremiumSignals = useCallback(
     (results: PairAnalysisResult[], previousResults: PairAnalysisResult[]) => {
       if (!isEnabled || permission !== 'granted') {
@@ -112,26 +113,20 @@ export function useNotifications({
           .filter(r => r.volatilitySpread.signalQuality === 'premium')
           .map(r => r.symbol)
       )
-
       const newPremiumSignals = results.filter(
-        r => r.volatilitySpread.signalQuality === 'premium' && !previousPremium.has(r.symbol)
+        r =>
+          r.volatilitySpread.signalQuality === 'premium' &&
+          r.confluence.rating >= 2 &&
+          !previousPremium.has(r.symbol)
       )
 
-      // Notify for each new premium signal
-      for (const signal of newPremiumSignals) {
-        notifyPremiumSignal(signal)
-      }
+      newPremiumSignals.forEach(signal => notifyPremiumSignal(signal))
     },
     [isEnabled, permission, notifyPremiumSignal]
   )
 
-  const toggleNotifications = useCallback(() => {
-    setIsEnabled(prev => !prev)
-  }, [])
-
-  const toggleSound = useCallback(() => {
-    setIsSoundEnabled(prev => !prev)
-  }, [])
+  const toggleNotifications = useCallback(() => setIsEnabled(prev => !prev), [])
+  const toggleSound = useCallback(() => setIsSoundEnabled(prev => !prev), [])
 
   return {
     permission,

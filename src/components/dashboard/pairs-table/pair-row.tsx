@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { ExternalLink, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +17,9 @@ import {
   getZScoreColorClass,
   getOpportunityScoreColorClass,
   getOpportunityScoreBarClass,
+  getConfluenceBadgeClass,
+  getConfluenceColorClass,
+  getConfluenceLabel,
 } from './utils'
 
 interface PairRowProps {
@@ -26,9 +30,175 @@ interface PairRowProps {
   onSelect: () => void
 }
 
-/**
- * Table row for displaying a single pair analysis result
- */
+interface SparklineData {
+  spread: number[]
+  color: string
+}
+
+function useSpreadSparkline(primaryPrices: number[], pairPrices: number[]): SparklineData {
+  return useMemo(() => {
+    if (primaryPrices.length === 0 || pairPrices.length === 0) {
+      return { spread: [], color: '#34d399' }
+    }
+
+    const len = Math.min(primaryPrices.length, pairPrices.length)
+    const lookback = 40
+    const startIndex = Math.max(0, len - lookback)
+    const pSlice = primaryPrices.slice(startIndex, len)
+    const sSlice = pairPrices.slice(startIndex, len)
+    const spread = calculateSpread(pSlice, sSlice)
+
+    const color =
+      spread.length > 0 && spread[spread.length - 1] >= spread[0] ? '#34d399' : '#fb7185'
+    return { spread, color }
+  }, [primaryPrices, pairPrices])
+}
+
+function PairSymbol({ symbol, primarySymbol }: { symbol: string; primarySymbol: string }) {
+  return (
+    <TableCell className="font-medium">
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col">
+          <span className="font-bold text-foreground">{symbol.replace('USDT', '')}</span>
+          <span className="text-[10px] text-muted-foreground">
+            vs {primarySymbol.replace('USDT', '')}
+          </span>
+        </div>
+      </div>
+    </TableCell>
+  )
+}
+
+function CorrelationCell({ correlation }: { correlation: number }) {
+  return (
+    <TableCell>
+      <div className="flex flex-col">
+        <span className={`font-mono font-medium ${getCorrelationColorClass(correlation)}`}>
+          {correlation >= 0 ? '+' : ''}
+          {correlation.toFixed(3)}
+        </span>
+      </div>
+    </TableCell>
+  )
+}
+
+function TrendCell({ spread, color }: { spread: number[]; color: string }) {
+  return (
+    <TableCell>
+      <div className="w-24 h-8">
+        <Sparkline data={spread} width={96} height={32} color={color} fill={true} />
+      </div>
+    </TableCell>
+  )
+}
+
+function ZScoreCell({ zScore }: { zScore: number }) {
+  return (
+    <TableCell>
+      <span className={`font-mono font-bold ${getZScoreColorClass(zScore)}`}>
+        {zScore >= 0 ? '+' : ''}
+        {zScore.toFixed(2)}σ
+      </span>
+    </TableCell>
+  )
+}
+
+function SignalCell({ quality }: { quality: string }) {
+  const label = getSignalLabel(quality as PairAnalysisResult['volatilitySpread']['signalQuality'])
+  const shortLabel = label.split(' ')[1] || quality
+
+  return (
+    <TableCell>
+      <Badge
+        variant="outline"
+        className={`uppercase text-[10px] tracking-wider ${getSignalBadgeClass(
+          quality as PairAnalysisResult['volatilitySpread']['signalQuality']
+        )}`}
+      >
+        {shortLabel}
+      </Badge>
+    </TableCell>
+  )
+}
+
+function RegimeCell({ regime }: { regime: string }) {
+  return (
+    <TableCell>
+      <span className="text-xs text-muted-foreground">{getRegimeLabel(regime)}</span>
+    </TableCell>
+  )
+}
+
+function ConfluenceCell({ rating, label }: { rating: number; label: string }) {
+  return (
+    <TableCell>
+      <div className="flex items-center gap-2">
+        <Badge
+          variant="outline"
+          className={`text-[10px] tracking-wider ${getConfluenceBadgeClass(rating)}`}
+          title={label}
+        >
+          {rating}/3
+        </Badge>
+        <span className={`text-xs ${getConfluenceColorClass(rating)}`}>
+          {getConfluenceLabel(rating)}
+        </span>
+      </div>
+    </TableCell>
+  )
+}
+
+function OpportunityCell({ score }: { score: number }) {
+  return (
+    <TableCell>
+      <div className="flex items-center gap-3">
+        <div className="w-16 h-1.5 bg-secondary/50 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full ${getOpportunityScoreBarClass(score)}`}
+            style={{ width: `${score}%` }}
+          />
+        </div>
+        <span className={`font-mono text-sm font-bold ${getOpportunityScoreColorClass(score)}`}>
+          {score}
+        </span>
+      </div>
+    </TableCell>
+  )
+}
+
+function ActionsCell({ symbol, onSelect }: { symbol: string; onSelect: () => void }) {
+  return (
+    <TableCell>
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+          title="View Details"
+          onClick={e => {
+            e.stopPropagation()
+            onSelect()
+          }}
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 hover:bg-blue-500/10 hover:text-blue-400"
+          title="Open in TradingView"
+          onClick={e => {
+            e.stopPropagation()
+            window.open(`https://www.tradingview.com/chart/?symbol=BINANCE:${symbol}`, '_blank')
+          }}
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
+      </div>
+    </TableCell>
+  )
+}
+
 export function PairRow({
   pair,
   currentPrimaryPair,
@@ -36,23 +206,10 @@ export function PairRow({
   pairPrices,
   onSelect,
 }: PairRowProps) {
-  // Calculate recent spread for sparkline (last 40 points)
-  let recentSpread: number[] = []
-  if (primaryPrices.length > 0 && pairPrices.length > 0) {
-    const len = Math.min(primaryPrices.length, pairPrices.length)
-    const lookback = 40
-    const startIndex = Math.max(0, len - lookback)
-    if (len > 0) {
-      const pSlice = primaryPrices.slice(startIndex, len)
-      const sSlice = pairPrices.slice(startIndex, len)
-      recentSpread = calculateSpread(pSlice, sSlice)
-    }
-  }
-
-  const sparklineColor =
-    recentSpread.length > 0 && recentSpread[recentSpread.length - 1] >= recentSpread[0]
-      ? '#34d399'
-      : '#fb7185'
+  const { spread: recentSpread, color: sparklineColor } = useSpreadSparkline(
+    primaryPrices,
+    pairPrices
+  )
 
   return (
     <motion.tr
@@ -63,120 +220,15 @@ export function PairRow({
       className="border-b transition-colors hover:bg-muted/40 cursor-pointer border-border/50 group relative"
       onClick={onSelect}
     >
-      {/* Pair Symbol */}
-      <TableCell className="font-medium">
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <span className="font-bold text-foreground">{pair.symbol.replace('USDT', '')}</span>
-            <span className="text-[10px] text-muted-foreground">
-              vs {currentPrimaryPair.replace('USDT', '')}
-            </span>
-          </div>
-        </div>
-      </TableCell>
-
-      {/* Correlation */}
-      <TableCell>
-        <div className="flex flex-col">
-          <span className={`font-mono font-medium ${getCorrelationColorClass(pair.correlation)}`}>
-            {pair.correlation >= 0 ? '+' : ''}
-            {pair.correlation.toFixed(3)}
-          </span>
-        </div>
-      </TableCell>
-
-      {/* Trend Sparkline */}
-      <TableCell>
-        <div className="w-24 h-8">
-          <Sparkline
-            data={recentSpread}
-            width={96}
-            height={32}
-            color={sparklineColor}
-            fill={true}
-          />
-        </div>
-      </TableCell>
-
-      {/* Spread Z-Score */}
-      <TableCell>
-        <span className={`font-mono font-bold ${getZScoreColorClass(pair.spreadZScore)}`}>
-          {pair.spreadZScore >= 0 ? '+' : ''}
-          {pair.spreadZScore.toFixed(2)}σ
-        </span>
-      </TableCell>
-
-      {/* Signal Quality */}
-      <TableCell>
-        <Badge
-          variant="outline"
-          className={`uppercase text-[10px] tracking-wider ${getSignalBadgeClass(
-            pair.volatilitySpread.signalQuality
-          )}`}
-        >
-          {getSignalLabel(pair.volatilitySpread.signalQuality).split(' ')[1] ||
-            pair.volatilitySpread.signalQuality}
-        </Badge>
-      </TableCell>
-
-      {/* Regime */}
-      <TableCell>
-        <span className="text-xs text-muted-foreground">
-          {getRegimeLabel(pair.correlationVelocity.regime)}
-        </span>
-      </TableCell>
-
-      {/* Opportunity Score */}
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <div className="w-16 h-1.5 bg-secondary/50 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${getOpportunityScoreBarClass(pair.opportunityScore)}`}
-              style={{ width: `${pair.opportunityScore}%` }}
-            />
-          </div>
-          <span
-            className={`font-mono text-sm font-bold ${getOpportunityScoreColorClass(
-              pair.opportunityScore
-            )}`}
-          >
-            {pair.opportunityScore}
-          </span>
-        </div>
-      </TableCell>
-
-      {/* Actions */}
-      <TableCell>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-            title="View Details"
-            onClick={e => {
-              e.stopPropagation()
-              onSelect()
-            }}
-          >
-            <Info className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-blue-500/10 hover:text-blue-400"
-            title="Open in TradingView"
-            onClick={e => {
-              e.stopPropagation()
-              window.open(
-                `https://www.tradingview.com/chart/?symbol=BINANCE:${pair.symbol}`,
-                '_blank'
-              )
-            }}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        </div>
-      </TableCell>
+      <PairSymbol symbol={pair.symbol} primarySymbol={currentPrimaryPair} />
+      <CorrelationCell correlation={pair.correlation} />
+      <TrendCell spread={recentSpread} color={sparklineColor} />
+      <ZScoreCell zScore={pair.spreadZScore} />
+      <SignalCell quality={pair.volatilitySpread.signalQuality} />
+      <RegimeCell regime={pair.correlationVelocity.regime} />
+      <ConfluenceCell rating={pair.confluence.rating} label={pair.confluence.ratingLabel} />
+      <OpportunityCell score={pair.opportunityScore} />
+      <ActionsCell symbol={pair.symbol} onSelect={onSelect} />
     </motion.tr>
   )
 }

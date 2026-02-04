@@ -12,6 +12,52 @@ interface SparklineProps {
   className?: string
 }
 
+interface SparklineData {
+  points: string
+  areaPoints: string
+  isUp: boolean
+}
+
+function calculateSparklinePoints(
+  data: number[],
+  width: number,
+  height: number
+): { points: string; isUp: boolean } {
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const isUp = data[data.length - 1] >= data[0]
+
+  const pts = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * width
+    const normalizedY = (val - min) / range
+    const y = height - normalizedY * height
+    return `${x},${y}`
+  })
+
+  return { points: pts.join(' '), isUp }
+}
+
+function calculateAreaPoints(points: string, width: number, height: number, fill: boolean): string {
+  return fill ? `${points} ${width},${height} 0,${height}` : ''
+}
+
+function processSparklineData(
+  data: number[] | undefined,
+  width: number,
+  height: number,
+  fill: boolean
+): SparklineData | null {
+  if (!data || data.length < 2) {
+    return null
+  }
+
+  const { points, isUp } = calculateSparklinePoints(data, width, height)
+  const areaPoints = calculateAreaPoints(points, width, height, fill)
+
+  return { points, areaPoints, isUp }
+}
+
 export function Sparkline({
   data,
   width = 100,
@@ -21,42 +67,19 @@ export function Sparkline({
   fill = false,
   className = '',
 }: SparklineProps) {
-  const { points, areaPoints, isUp } = useMemo(() => {
-    if (!data || data.length < 2) {
-      return { points: '', areaPoints: '', isUp: true }
-    }
+  const sparklineData = useMemo(
+    () => processSparklineData(data, width, height, fill),
+    [data, width, height, fill]
+  )
 
-    const min = Math.min(...data)
-    const max = Math.max(...data)
-    const range = max - min || 1 // Avoid division by zero
-
-    // Determine trend
-    const isUp = data[data.length - 1] >= data[0]
-
-    // Map data to coordinate system
-    const pts = data.map((val, i) => {
-      const x = (i / (data.length - 1)) * width
-      // Invert Y because SVG origin is top-left
-      const normalizedY = (val - min) / range
-      const y = height - normalizedY * height
-      return `${x},${y}`
-    })
-
-    const pointsStr = pts.join(' ')
-
-    // Close the path for fill if needed
-    const areaPointsStr = fill ? `${pointsStr} ${width},${height} 0,${height}` : ''
-
-    return { points: pointsStr, areaPoints: areaPointsStr, isUp }
-  }, [data, width, height, fill])
-
-  if (!data || data.length < 2) {
+  if (!sparklineData) {
     return null
   }
 
-  // Determine color based on trend if explicitly requested, otherwise use provided color
-  // For this generic component, we'll let the parent pass the color class usually,
-  // but default "currentColor" allows parent to style via text-color utility.
+  const { points, areaPoints, isUp } = sparklineData
+  const lastY = parseFloat(points.split(' ').pop()?.split(',')[1] || '0')
+  const gradientId = `spark-gradient-${isUp ? 'up' : 'down'}`
+  const strokeColor = color === 'currentColor' ? 'currentColor' : color
 
   return (
     <svg
@@ -68,38 +91,25 @@ export function Sparkline({
     >
       {/* Gradient definition for fill */}
       <defs>
-        <linearGradient id={`spark-gradient-${isUp ? 'up' : 'down'}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.2" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
         </linearGradient>
       </defs>
 
-      {fill && (
-        <polygon
-          points={areaPoints}
-          fill={`url(#spark-gradient-${isUp ? 'up' : 'down'})`}
-          stroke="none"
-        />
-      )}
+      {fill && <polygon points={areaPoints} fill={`url(#${gradientId})`} stroke="none" />}
 
       <polyline
         points={points}
         fill="none"
-        stroke={color === 'currentColor' ? 'currentColor' : color}
+        stroke={strokeColor}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
 
       {/* Optional: Add a dot at the end */}
-      {points && (
-        <circle
-          cx={width}
-          cy={parseFloat(points.split(' ').pop()?.split(',')[1] || '0')}
-          r={strokeWidth + 1}
-          fill={color === 'currentColor' ? 'currentColor' : color}
-        />
-      )}
+      {points && <circle cx={width} cy={lastY} r={strokeWidth + 1} fill={strokeColor} />}
     </svg>
   )
 }

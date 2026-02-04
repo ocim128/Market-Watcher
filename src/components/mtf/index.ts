@@ -1,6 +1,6 @@
-// Multi-Timeframe Panel Components
+// Multi-Timeframe Analysis Components
 
-export { MultiTimeframePanel } from './multi-timeframe-panel'
+export { MtfAnalysis } from './mtf-analysis'
 export { ConfluenceCard } from './confluence-card'
 export { TimeframeBadge } from './timeframe-badge'
 export { SettingsPanel } from './settings-panel'

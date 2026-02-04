@@ -1,5 +1,5 @@
 /**
- * Constants for multi-timeframe panel
+ * Constants for multi-timeframe analysis
  */
 
 import { getScalpingIntervals, isBinanceNativeInterval } from '@/lib/binance/resample'

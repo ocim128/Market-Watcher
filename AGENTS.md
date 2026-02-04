@@ -25,27 +25,49 @@ A real-time pair trading opportunity dashboard for cryptocurrency markets. Built
 
 ```
 src/
-├── app/                    # Next.js app router
-│   ├── layout.tsx         # Root layout with Providers, Inter font, gradient background
-│   ├── page.tsx           # Main dashboard: Header, OpportunitySummary, BacktestAllPanel, PairsTable
-│   └── globals.css        # Tailwind + CSS variables + custom utilities
+├── app/                          # Next.js app router
+│   ├── (dashboard)/             # Route group for dashboard pages
+│   │   ├── layout.tsx          # Dashboard layout with navigation sidebar
+│   │   ├── page.tsx            # Main dashboard: DashboardHeader, OpportunitySummary, BacktestAllPanel, PairsTable, QuickAccess
+│   │   ├── mtf/page.tsx        # Multi-Timeframe Confluence page
+│   │   └── history/page.tsx    # Historical Tracking page
+│   ├── layout.tsx              # Root layout with Providers, gradient background
+│   └── globals.css             # Tailwind + CSS variables + custom utilities
 ├── components/
-│   ├── providers.tsx      # QueryClient + ThemeProvider + ScanProvider
-│   ├── scan-context.tsx   # React context for scan state management
-│   ├── charts/            # Lightweight Charts wrappers
+│   ├── providers.tsx           # QueryClient + ThemeProvider + ScanProvider
+│   ├── scan-context.tsx        # React context for scan state management
+│   ├── navigation/             # Navigation components
+│   │   ├── main-nav.tsx        # Desktop sidebar + mobile header
+│   │   ├── nav-item.tsx        # Navigation item component
+│   │   └── index.ts
+│   ├── charts/                 # Lightweight Charts wrappers
 │   │   ├── spread-chart.tsx
 │   │   ├── correlation-chart.tsx
 │   │   └── price-comparison-chart.tsx
-│   ├── dashboard/         # Dashboard-specific components
-│   │   ├── header.tsx
+│   ├── dashboard/              # Dashboard-specific components
+│   │   ├── dashboard-header.tsx   # Simplified header with scan controls
 │   │   ├── opportunity-summary.tsx
 │   │   ├── pairs-table.tsx
 │   │   ├── pair-detail-modal.tsx
 │   │   ├── filter-controls.tsx
 │   │   ├── settings-panel.tsx
 │   │   ├── backtest-panel.tsx
-│   │   └── backtest-all-panel.tsx
-│   └── ui/                # shadcn/ui base components (button, card, table, badge, etc.)
+│   │   ├── backtest-all-panel.tsx
+│   │   └── quick-access.tsx       # Cards linking to MTF/History
+│   ├── mtf/                    # Multi-Timeframe components
+│   │   ├── mtf-analysis.tsx
+│   │   ├── confluence-card.tsx
+│   │   ├── settings-panel.tsx
+│   │   ├── timeframe-badge.tsx
+│   │   └── constants.ts
+│   ├── history/                # Historical Tracking components
+│   │   ├── history-analysis.tsx
+│   │   ├── trend-badge.tsx
+│   │   ├── summary-stats.tsx
+│   │   ├── opportunity-trends.tsx
+│   │   ├── best-opportunities.tsx
+│   │   └── page-header.tsx
+│   └── ui/                     # shadcn/ui base components
 ├── hooks/
 │   ├── use-binance-data.ts    # TanStack Query hooks for API data
 │   ├── use-pair-scan.ts       # Scan orchestration hook
@@ -69,6 +91,28 @@ src/
 └── types/
     ├── index.ts           # Core types: PairAnalysisResult, SignalQuality, etc.
     └── backtest-types.ts  # Backtest-specific types
+```
+
+## Navigation
+
+The app uses a sidebar navigation pattern with a route group for dashboard pages:
+
+### Routes
+| Route | Description | Component |
+|-------|-------------|-----------|
+| `/` | Main Dashboard | `DashboardHeader`, `OpportunitySummary`, `QuickAccess`, `PairsTable` |
+| `/mtf` | Multi-Timeframe Confluence | `MtfAnalysis` with full-page confluence scanning |
+| `/history` | Historical Tracking | `HistoryAnalysis` with trends and stats |
+
+### Navigation Components
+- `components/navigation/main-nav.tsx` - Desktop sidebar + mobile drawer
+- `components/navigation/nav-item.tsx` - Individual nav item with active state
+
+### Layout Structure
+```
+(dashboard)/layout.tsx
+├── MainNav (sidebar)
+└── main content (page specific)
 ```
 
 ## Key Architectural Patterns
@@ -272,7 +316,7 @@ The statistical analysis was ported from OpenBullet2's pair trading module. Key 
 
 ### Multi-Timeframe Confluence Analysis
 
-Located in `lib/analysis/multi-timeframe.ts`, `lib/binance/resample.ts`, and `components/dashboard/multi-timeframe-panel.tsx`.
+Located in `lib/analysis/multi-timeframe.ts`, `lib/binance/resample.ts`, and `components/mtf/`. Access via `/mtf` route.
 
 #### Native + Custom Resampled Intervals
 
@@ -318,14 +362,15 @@ const { sourceInterval, needsResample } = resolveFetchInterval("7m")
 - **Advanced**: All intervals 1m-15m (comprehensive but slower)
 
 **Usage:**
-- Click "MTF Scan" in the Multi-Timeframe panel
+- Navigate to "Multi-Timeframe" from sidebar menu
+- Click "Run MTF Scan" to analyze
 - Select preset or custom intervals (custom ones marked with ✨)
 - Adjust bar count and pair limit in settings
 - Results sorted by confluence score
 
 ### Historical Tracking
 
-Located in `lib/history/tracking.ts` and `components/dashboard/history-panel.tsx`.
+Located in `lib/history/tracking.ts` and `components/history/`. Access via `/history` route.
 
 Automatically persists scan results to localStorage for trend analysis:
 
@@ -346,8 +391,9 @@ Automatically persists scan results to localStorage for trend analysis:
 
 **Usage:**
 - Scans are saved automatically after analysis completes
-- View trends in the History panel
-- Export data for external analysis
+- Navigate to "History" from sidebar menu
+- View trends, stats, and best performers
+- Export data to CSV
 - Click pair names to see detailed history (future enhancement)
 
 ## Dependencies to Know

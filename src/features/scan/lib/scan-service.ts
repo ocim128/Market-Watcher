@@ -98,76 +98,90 @@ export function saveToHistory(
   }
 }
 
-/**
- * Execute a scan operation
- *
- * This is the core scanning function that:
- * 1. Fetches top pairs from Binance
- * 2. Fetches klines for each pair (with caching)
- * 3. Optionally analyzes results and saves to history
- */
+async function processScanBatch(
+  batch: string[],
+  interval: string,
+  totalBars: number,
+  queryClient: QueryClient,
+  scanResults: ScanResult[]
+): Promise<void> {
+  const batchPromises = batch.map(symbol =>
+    fetchWithCache(symbol, interval, totalBars, queryClient)
+  )
+  const batchResults = await Promise.allSettled(batchPromises)
+
+  for (const result of batchResults) {
+    if (result.status === 'fulfilled' && result.value.klines.length > 0) {
+      scanResults.push(result.value)
+    }
+  }
+}
+
+interface ScanExecutionParams {
+  limit: number
+  interval: string
+  totalBars: number
+  primaryPair: string
+  concurrency: number
+  includePrimary: boolean
+}
+
+async function getScanSymbols(params: ScanExecutionParams): Promise<string[]> {
+  const pairs = await getTopUsdtPairs(params.limit)
+  const filteredPairs = pairs.filter(p => p !== params.primaryPair)
+  return params.includePrimary ? [params.primaryPair, ...filteredPairs] : filteredPairs
+}
+
+function scheduleHistorySave(
+  scanResults: ScanResult[],
+  primaryPair: string,
+  interval: string
+): void {
+  setTimeout(() => saveToHistory(scanResults, primaryPair, interval), 600)
+}
+
+function normalizeScanOptions(options: ScanOptions): ScanExecutionParams {
+  return {
+    limit: options.limit ?? config.topPairsLimit,
+    interval: options.interval ?? config.interval,
+    totalBars: options.totalBars ?? config.totalBars,
+    primaryPair: options.primaryPair ?? config.primaryPair,
+    concurrency: options.concurrency ?? 5,
+    includePrimary: options.includePrimary ?? true,
+  }
+}
+
 export async function executeScan(
   options: ScanOptions,
   queryClient: QueryClient,
   onProgress: (current: number, total: number, currentSymbol: string) => void
 ): Promise<{ results: ScanResult[]; error?: string }> {
-  const {
-    limit = config.topPairsLimit,
-    interval = config.interval,
-    totalBars = config.totalBars,
-    primaryPair = config.primaryPair,
-    concurrency = 5,
-    includePrimary = true,
-    autoAnalyze = true,
-  } = options
+  const params = normalizeScanOptions(options)
 
   try {
-    // Step 1: Get top pairs
-    let pairs = await getTopUsdtPairs(limit)
-    pairs = pairs.filter(p => p !== primaryPair)
-
-    const allSymbols = includePrimary ? [primaryPair, ...pairs] : pairs
-
-    onProgress(0, allSymbols.length, primaryPair)
+    const allSymbols = await getScanSymbols(params)
+    onProgress(0, allSymbols.length, params.primaryPair)
 
     const scanResults: ScanResult[] = []
 
-    // Step 2: Fetch klines with concurrency
-    for (let i = 0; i < allSymbols.length; i += concurrency) {
-      const batch = allSymbols.slice(i, i + concurrency)
+    for (let i = 0; i < allSymbols.length; i += params.concurrency) {
+      const batch = allSymbols.slice(i, i + params.concurrency)
+      await processScanBatch(batch, params.interval, params.totalBars, queryClient, scanResults)
 
-      const batchPromises = batch.map(symbol =>
-        fetchWithCache(symbol, interval, totalBars, queryClient)
-      )
-
-      const batchResults = await Promise.allSettled(batchPromises)
-
-      for (const result of batchResults) {
-        if (result.status === 'fulfilled' && result.value.klines.length > 0) {
-          scanResults.push(result.value)
-        }
-      }
-
-      const completed = Math.min(i + concurrency, allSymbols.length)
+      const completed = Math.min(i + params.concurrency, allSymbols.length)
       onProgress(completed, allSymbols.length, batch[batch.length - 1] || '')
 
-      // Small delay between batches to avoid rate limiting
-      if (i + concurrency < allSymbols.length) {
+      if (i + params.concurrency < allSymbols.length) {
         await new Promise(resolve => setTimeout(resolve, config.scanDelayMs))
       }
     }
 
-    // Auto-save to history if requested
-    if (autoAnalyze && scanResults.length > 0) {
-      // Delay to allow state to settle
-      setTimeout(() => {
-        saveToHistory(scanResults, primaryPair, interval)
-      }, 600)
+    if (options.autoAnalyze !== false && scanResults.length > 0) {
+      scheduleHistorySave(scanResults, params.primaryPair, params.interval)
     }
 
     return { results: scanResults }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return { results: [], error: errorMessage }
+    return { results: [], error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

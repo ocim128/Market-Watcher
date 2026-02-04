@@ -1,3 +1,4 @@
+'use client'
 /**
  * Hook for managing table filters
  */
@@ -58,6 +59,11 @@ export function useTableFilters(analysisResults: PairAnalysisResult[]): UseTable
 
       // Regime filter
       if (!filters.regimes.includes(pair.correlationVelocity.regime)) {
+        return false
+      }
+
+      // Confluence filter (Feature #1)
+      if (pair.confluence.rating < filters.minConfluence) {
         return false
       }
 

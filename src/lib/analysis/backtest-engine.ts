@@ -85,9 +85,142 @@ function calculateCombinedPnL(
   }
 }
 
-/**
- * Run backtest simulation on historical price data
- */
+function checkEntryCondition(
+  spreadZ: number,
+  threshold: number,
+  inPosition: boolean
+): { shouldEnter: boolean; direction: TradeDirection | null } {
+  if (inPosition) {
+    return { shouldEnter: false, direction: null }
+  }
+  const spreadAboveThreshold = Math.abs(spreadZ) > Math.abs(threshold)
+  if (!spreadAboveThreshold) {
+    return { shouldEnter: false, direction: null }
+  }
+  return { shouldEnter: true, direction: spreadZ > 0 ? 'short_primary' : 'long_primary' }
+}
+
+function checkExitCondition(currentPnL: number, config: BacktestConfig): ExitReason | null {
+  if (currentPnL >= config.takeProfitPercent) {
+    return 'take_profit'
+  }
+  if (currentPnL <= -config.stopLossPercent) {
+    return 'stop_loss'
+  }
+  return null
+}
+
+function createTrade(
+  entry: Partial<Trade>,
+  exitIndex: number,
+  exitSpread: number,
+  profitPercent: number,
+  exitReason: ExitReason,
+  primaryCloses: number[],
+  secondaryCloses: number[]
+): Trade {
+  return {
+    entryIndex: entry.entryIndex!,
+    exitIndex,
+    entrySpread: entry.entrySpread!,
+    exitSpread,
+    entryCorrelation: entry.entryCorrelation!,
+    entryPrices: entry.entryPrices!,
+    exitPrices: { primary: primaryCloses[exitIndex], secondary: secondaryCloses[exitIndex] },
+    direction: entry.direction!,
+    profitPercent,
+    exitReason,
+    durationBars: exitIndex - entry.entryIndex!,
+  }
+}
+
+function runBacktestIteration(
+  primaryCloses: number[],
+  secondaryCloses: number[],
+  minLength: number,
+  config: BacktestConfig,
+  overallCorrelation: number,
+  trades: Trade[]
+): void {
+  let inPosition = false
+  let currentTrade: Partial<Trade> | null = null
+
+  for (let i = ROLLING_WINDOW; i < minLength; i++) {
+    const spreadZ = calculateRollingSpreadZScore(primaryCloses, secondaryCloses, i, ROLLING_WINDOW)
+
+    if (!inPosition) {
+      const { shouldEnter, direction } = checkEntryCondition(
+        spreadZ,
+        config.entrySpreadThreshold,
+        inPosition
+      )
+      if (shouldEnter && direction) {
+        currentTrade = {
+          entryIndex: i,
+          entrySpread: spreadZ,
+          entryCorrelation: overallCorrelation,
+          entryPrices: { primary: primaryCloses[i], secondary: secondaryCloses[i] },
+          direction,
+        }
+        inPosition = true
+      }
+    } else if (currentTrade) {
+      const currentPnL = calculateCombinedPnL(
+        currentTrade.direction!,
+        currentTrade.entryPrices!.primary,
+        currentTrade.entryPrices!.secondary,
+        primaryCloses[i],
+        secondaryCloses[i]
+      )
+
+      const exitReason = checkExitCondition(currentPnL, config)
+      if (exitReason) {
+        trades.push(
+          createTrade(
+            currentTrade,
+            i,
+            spreadZ,
+            currentPnL,
+            exitReason,
+            primaryCloses,
+            secondaryCloses
+          )
+        )
+        inPosition = false
+        currentTrade = null
+      }
+    }
+  }
+
+  if (inPosition && currentTrade) {
+    const lastIdx = minLength - 1
+    const finalPnL = calculateCombinedPnL(
+      currentTrade.direction!,
+      currentTrade.entryPrices!.primary,
+      currentTrade.entryPrices!.secondary,
+      primaryCloses[lastIdx],
+      secondaryCloses[lastIdx]
+    )
+    const finalSpreadZ = calculateRollingSpreadZScore(
+      primaryCloses,
+      secondaryCloses,
+      lastIdx,
+      ROLLING_WINDOW
+    )
+    trades.push(
+      createTrade(
+        currentTrade,
+        lastIdx,
+        finalSpreadZ,
+        finalPnL,
+        'end_of_data',
+        primaryCloses,
+        secondaryCloses
+      )
+    )
+  }
+}
+
 export function runBacktest(
   primaryCloses: number[],
   secondaryCloses: number[],
@@ -98,140 +231,38 @@ export function runBacktest(
   const fullConfig: BacktestConfig = { ...DEFAULT_BACKTEST_CONFIG, ...config }
   const minLength = Math.min(primaryCloses.length, secondaryCloses.length)
 
-  // Need at least ROLLING_WINDOW + some bars to trade
   if (minLength < ROLLING_WINDOW + 10) {
     return createEmptyBacktestResult(symbol, primarySymbol, fullConfig)
   }
 
-  // Calculate overall correlation once (not rolling per-bar)
-  // This determines if the pair is suitable for pair trading
   const alignedPrimary = primaryCloses.slice(-minLength)
   const alignedSecondary = secondaryCloses.slice(-minLength)
-  const primaryReturns = calculateReturns(alignedPrimary)
-  const secondaryReturns = calculateReturns(alignedSecondary)
-  const overallCorrelation = pearsonCorrelation(primaryReturns, secondaryReturns)
+  const overallCorrelation = pearsonCorrelation(
+    calculateReturns(alignedPrimary),
+    calculateReturns(alignedSecondary)
+  )
 
-  // If overall correlation doesn't meet threshold, no trades for this pair
   if (overallCorrelation < fullConfig.minCorrelation) {
     return createEmptyBacktestResult(symbol, primarySymbol, fullConfig)
   }
 
   const trades: Trade[] = []
-  let inPosition = false
-  let currentTrade: Partial<Trade> | null = null
-
-  // Start after we have enough data for rolling calculations
-  for (let i = ROLLING_WINDOW; i < minLength; i++) {
-    const spreadZ = calculateRollingSpreadZScore(primaryCloses, secondaryCloses, i, ROLLING_WINDOW)
-
-    if (!inPosition) {
-      // Check entry condition: |spread Z| > |threshold| (abs protects against negative input)
-      const spreadAboveThreshold = Math.abs(spreadZ) > Math.abs(fullConfig.entrySpreadThreshold)
-
-      if (spreadAboveThreshold) {
-        // Determine direction based on spread sign
-        const direction: TradeDirection = spreadZ > 0 ? 'short_primary' : 'long_primary'
-
-        currentTrade = {
-          entryIndex: i,
-          entrySpread: spreadZ,
-          entryCorrelation: overallCorrelation,
-          entryPrices: {
-            primary: primaryCloses[i],
-            secondary: secondaryCloses[i],
-          },
-          direction,
-        }
-        inPosition = true
-      }
-    } else if (currentTrade) {
-      // Check exit conditions
-      const currentPnL = calculateCombinedPnL(
-        currentTrade.direction!,
-        currentTrade.entryPrices!.primary,
-        currentTrade.entryPrices!.secondary,
-        primaryCloses[i],
-        secondaryCloses[i]
-      )
-
-      let exitReason: ExitReason | null = null
-
-      if (currentPnL >= fullConfig.takeProfitPercent) {
-        exitReason = 'take_profit'
-      } else if (currentPnL <= -fullConfig.stopLossPercent) {
-        exitReason = 'stop_loss'
-      }
-
-      if (exitReason) {
-        const completedTrade: Trade = {
-          entryIndex: currentTrade.entryIndex!,
-          exitIndex: i,
-          entrySpread: currentTrade.entrySpread!,
-          exitSpread: spreadZ,
-          entryCorrelation: currentTrade.entryCorrelation!,
-          entryPrices: currentTrade.entryPrices!,
-          exitPrices: {
-            primary: primaryCloses[i],
-            secondary: secondaryCloses[i],
-          },
-          direction: currentTrade.direction!,
-          profitPercent: currentPnL,
-          exitReason,
-          durationBars: i - currentTrade.entryIndex!,
-        }
-        trades.push(completedTrade)
-        inPosition = false
-        currentTrade = null
-      }
-    }
-  }
-
-  // Close any open position at end of data
-  if (inPosition && currentTrade) {
-    const lastIdx = minLength - 1
-    const finalPnL = calculateCombinedPnL(
-      currentTrade.direction!,
-      currentTrade.entryPrices!.primary,
-      currentTrade.entryPrices!.secondary,
-      primaryCloses[lastIdx],
-      secondaryCloses[lastIdx]
-    )
-
-    const completedTrade: Trade = {
-      entryIndex: currentTrade.entryIndex!,
-      exitIndex: lastIdx,
-      entrySpread: currentTrade.entrySpread!,
-      exitSpread: calculateRollingSpreadZScore(
-        primaryCloses,
-        secondaryCloses,
-        lastIdx,
-        ROLLING_WINDOW
-      ),
-      entryCorrelation: currentTrade.entryCorrelation!,
-      entryPrices: currentTrade.entryPrices!,
-      exitPrices: {
-        primary: primaryCloses[lastIdx],
-        secondary: secondaryCloses[lastIdx],
-      },
-      direction: currentTrade.direction!,
-      profitPercent: finalPnL,
-      exitReason: 'end_of_data',
-      durationBars: lastIdx - currentTrade.entryIndex!,
-    }
-    trades.push(completedTrade)
-  }
-
-  // Calculate summary and equity curve
-  const summary = calculateSummary(trades)
-  const equityCurve = calculateEquityCurve(trades)
+  runBacktestIteration(
+    primaryCloses,
+    secondaryCloses,
+    minLength,
+    fullConfig,
+    overallCorrelation,
+    trades
+  )
 
   return {
     symbol,
     primarySymbol,
     config: fullConfig,
     trades,
-    summary,
-    equityCurve,
+    summary: calculateSummary(trades),
+    equityCurve: calculateEquityCurve(trades),
     timestamp: Date.now(),
   }
 }

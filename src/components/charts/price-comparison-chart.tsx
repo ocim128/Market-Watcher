@@ -13,9 +13,6 @@ interface PriceComparisonChartProps {
   height?: number
 }
 
-/**
- * Normalize prices to percentage change from first value for comparison
- */
 function normalizePrices(prices: number[]): number[] {
   if (prices.length === 0) {
     return []
@@ -25,6 +22,71 @@ function normalizePrices(prices: number[]): number[] {
     return prices.map(() => 0)
   }
   return prices.map(p => ((p - first) / first) * 100)
+}
+
+function createChartData(
+  normalized: number[],
+  timestamps: number[] | undefined,
+  length: number
+): LineData[] {
+  const now = Date.now()
+  const hourMs = 60 * 60 * 1000
+
+  return normalized.slice(-length).map((value, i) => ({
+    time: (timestamps ? timestamps[i] / 1000 : (now - (length - i) * hourMs) / 1000) as Time,
+    value,
+  }))
+}
+
+function initPriceChart(
+  container: HTMLDivElement | null,
+  height: number,
+  primaryLabel: string,
+  secondaryLabel: string,
+  primaryRef: React.MutableRefObject<ISeriesApi<'Line'> | null>,
+  secondaryRef: React.MutableRefObject<ISeriesApi<'Line'> | null>
+) {
+  if (!container) {
+    return null
+  }
+
+  const chart = createChart(container, {
+    layout: {
+      background: { type: ColorType.Solid, color: 'transparent' },
+      textColor: '#9ca3af',
+    },
+    grid: {
+      vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+      horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+    },
+    crosshair: {
+      mode: CrosshairMode.Magnet,
+      vertLine: { color: 'rgba(255, 255, 255, 0.2)' },
+      horzLine: { color: 'rgba(255, 255, 255, 0.2)' },
+    },
+    width: container.clientWidth,
+    height,
+    rightPriceScale: { borderVisible: false },
+    timeScale: { borderVisible: false, timeVisible: true },
+  })
+
+  primaryRef.current = chart.addSeries(LineSeries, {
+    color: '#3b82f6',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: true,
+    title: primaryLabel,
+  })
+
+  secondaryRef.current = chart.addSeries(LineSeries, {
+    color: '#f59e0b',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: true,
+    title: secondaryLabel,
+  })
+
+  return chart
 }
 
 export function PriceComparisonChart({
@@ -41,61 +103,15 @@ export function PriceComparisonChart({
   const secondarySeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
 
   const initChart = useCallback(() => {
-    if (!chartContainerRef.current) {
-      return
-    }
-
-    if (chartRef.current) {
-      chartRef.current.remove()
-      chartRef.current = null
-    }
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#9ca3af',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
-      },
-      crosshair: {
-        mode: CrosshairMode.Magnet,
-        vertLine: { color: 'rgba(255, 255, 255, 0.2)' },
-        horzLine: { color: 'rgba(255, 255, 255, 0.2)' },
-      },
-      width: chartContainerRef.current.clientWidth,
+    chartRef.current = initPriceChart(
+      chartContainerRef.current,
       height,
-      rightPriceScale: {
-        borderVisible: false,
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-      },
-    })
-
-    chartRef.current = chart
-
-    // Primary pair line (e.g., ETH)
-    primarySeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#3b82f6', // Blue
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: true,
-      title: primaryLabel,
-    })
-
-    // Secondary pair line
-    secondarySeriesRef.current = chart.addSeries(LineSeries, {
-      color: '#f59e0b', // Orange
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: true,
-      title: secondaryLabel,
-    })
-
-    return chart
+      primaryLabel,
+      secondaryLabel,
+      primarySeriesRef,
+      secondarySeriesRef
+    )
+    return chartRef.current
   }, [height, primaryLabel, secondaryLabel])
 
   useEffect(() => {
@@ -117,28 +133,12 @@ export function PriceComparisonChart({
       return
     }
 
-    const now = Date.now()
-    const hourMs = 60 * 60 * 1000
-
-    // Normalize to % change for comparison
     const normalizedPrimary = normalizePrices(primaryPrices)
     const normalizedSecondary = normalizePrices(secondaryPrices)
-
     const length = Math.min(normalizedPrimary.length, normalizedSecondary.length)
 
-    const primaryData: LineData[] = normalizedPrimary.slice(-length).map((value, i) => ({
-      time: (timestamps ? timestamps[i] / 1000 : (now - (length - i) * hourMs) / 1000) as Time,
-      value,
-    }))
-
-    const secondaryData: LineData[] = normalizedSecondary.slice(-length).map((value, i) => ({
-      time: (timestamps ? timestamps[i] / 1000 : (now - (length - i) * hourMs) / 1000) as Time,
-      value,
-    }))
-
-    primarySeriesRef.current.setData(primaryData)
-    secondarySeriesRef.current.setData(secondaryData)
-
+    primarySeriesRef.current.setData(createChartData(normalizedPrimary, timestamps, length))
+    secondarySeriesRef.current.setData(createChartData(normalizedSecondary, timestamps, length))
     chartRef.current?.timeScale().fitContent()
   }, [primaryPrices, secondaryPrices, timestamps])
 

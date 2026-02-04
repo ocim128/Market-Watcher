@@ -1,38 +1,9 @@
-/**
- * useScan Hook - React hook for scan operations
- *
- * This hook provides the same API as the old useScan() from context,
- * but uses Zustand for state management. This allows for:
- * - Better performance (no unnecessary re-renders)
- * - No provider wrapper needed
- * - Easier testing
- */
-
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useScanStore, ScanOptions, ScanResult } from '../store/scan-store'
 import { executeScan, analyzeScanResults } from '../lib/scan-service'
 
-/**
- * Hook for scanning and analyzing trading pairs
- *
- * @example
- * ```typescript
- * function MyComponent() {
- *   const { scan, isScanning, analysisResults } = useScan()
- *
- *   return (
- *     <button onClick={() => scan()} disabled={isScanning}>
- *       {isScanning ? 'Scanning...' : 'Scan'}
- *     </button>
- *   )
- * }
- * ```
- */
-export function useScan() {
-  const queryClient = useQueryClient()
-
-  // Get state from Zustand store
+function useScanState() {
   const progress = useScanStore(state => state.progress)
   const results = useScanStore(state => state.results)
   const analysisResults = useScanStore(state => state.analysisResults)
@@ -43,7 +14,20 @@ export function useScan() {
   const isComplete = useScanStore(state => state.isComplete)
   const isError = useScanStore(state => state.isError)
 
-  // Get actions from Zustand store
+  return {
+    progress,
+    results,
+    analysisResults,
+    currentPrimaryPair,
+    lastScanTime,
+    isScanning,
+    isAnalyzing,
+    isComplete,
+    isError,
+  }
+}
+
+function useScanActions() {
   const startScan = useScanStore(state => state.startScan)
   const completeScan = useScanStore(state => state.completeScan)
   const setError = useScanStore(state => state.setError)
@@ -55,107 +39,84 @@ export function useScan() {
   const completeAnalysis = useScanStore(state => state.completeAnalysis)
   const reset = useScanStore(state => state.reset)
 
-  /**
-   * Execute a scan operation
-   *
-   * Fetches klines for top pairs and optionally analyzes them
-   */
+  return {
+    startScan,
+    completeScan,
+    setError,
+    setResults,
+    setAnalysisResults,
+    setCurrentPrimaryPair,
+    updateScanProgress,
+    startAnalysis,
+    completeAnalysis,
+    reset,
+  }
+}
+
+export function useScan() {
+  const queryClient = useQueryClient()
+  const state = useScanState()
+  const actions = useScanActions()
+
   const scan = useCallback(
     async (options: ScanOptions = {}): Promise<ScanResult[]> => {
-      const primaryPair = options.primaryPair || currentPrimaryPair
+      const primaryPair = options.primaryPair || state.currentPrimaryPair
 
-      // Update current primary pair if changed
-      if (options.primaryPair && options.primaryPair !== currentPrimaryPair) {
-        setCurrentPrimaryPair(options.primaryPair)
+      if (options.primaryPair && options.primaryPair !== state.currentPrimaryPair) {
+        actions.setCurrentPrimaryPair(options.primaryPair)
       }
 
-      // Start scan
-      startScan()
-
-      // Execute scan
+      actions.startScan()
       const { results: scanResults, error } = await executeScan(
         options,
         queryClient,
-        updateScanProgress
+        actions.updateScanProgress
       )
 
       if (error) {
-        setError(error)
+        actions.setError(error)
         throw new Error(error)
       }
 
-      // Update results
-      setResults(scanResults)
-      completeScan()
+      actions.setResults(scanResults)
+      actions.completeScan()
 
-      // Auto-analyze if requested
       if (options.autoAnalyze !== false && scanResults.length > 0) {
         setTimeout(() => {
-          startAnalysis()
+          actions.startAnalysis()
           const analyzed = analyzeScanResults(scanResults, primaryPair)
-          setAnalysisResults(analyzed)
-          completeAnalysis()
+          actions.setAnalysisResults(analyzed)
+          actions.completeAnalysis()
         }, 100)
       }
 
       return scanResults
     },
-    [
-      queryClient,
-      currentPrimaryPair,
-      startScan,
-      setCurrentPrimaryPair,
-      updateScanProgress,
-      setError,
-      setResults,
-      completeScan,
-      startAnalysis,
-      setAnalysisResults,
-      completeAnalysis,
-    ]
+    [queryClient, state.currentPrimaryPair, actions]
   )
 
-  /**
-   * Analyze existing scan results
-   *
-   * Useful for re-analyzing with different parameters
-   */
   const analyze = useCallback(() => {
-    if (results.length === 0) {
+    if (state.results.length === 0) {
       console.warn('No results to analyze')
       return
     }
 
-    startAnalysis()
-
+    actions.startAnalysis()
     try {
-      const analyzed = analyzeScanResults(results, currentPrimaryPair)
-      setAnalysisResults(analyzed)
+      const analyzed = analyzeScanResults(state.results, state.currentPrimaryPair)
+      actions.setAnalysisResults(analyzed)
     } catch (error) {
       console.error('Analysis failed:', error)
     } finally {
-      completeAnalysis()
+      actions.completeAnalysis()
     }
-  }, [results, currentPrimaryPair, startAnalysis, setAnalysisResults, completeAnalysis])
+  }, [state.results, state.currentPrimaryPair, actions])
 
   return {
-    // State
-    progress,
-    results,
-    analysisResults,
-    currentPrimaryPair,
-    setCurrentPrimaryPair,
-    lastScanTime,
-
-    // Computed states
-    isScanning,
-    isAnalyzing,
-    isComplete,
-    isError,
-
-    // Actions
+    ...state,
+    setCurrentPrimaryPair: actions.setCurrentPrimaryPair,
     scan,
     analyze,
-    reset,
+    reset: actions.reset,
   }
 }
