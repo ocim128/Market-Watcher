@@ -1,5 +1,5 @@
 // Feature: Scan
-// Orchestrates pair scanning and data fetching from Binance
+// Orchestrates pair scanning and data fetching from configured sources
 
 // Store
 export { useScanStore } from './store/scan-store'

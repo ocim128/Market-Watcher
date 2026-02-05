@@ -86,24 +86,27 @@ export function calculateCorrelationVelocity(
 /**
  * Determine the correlation regime based on current value and velocity
  */
-function determineCorrelationRegime(
+export function determineCorrelationRegime(
   current: number,
   velocity: number,
   previous: number
 ): CorrelationRegime {
+  const currentStrength = Math.abs(current)
+  const previousStrength = Math.abs(previous)
+
   if (Math.abs(velocity) > VELOCITY_THRESHOLD) {
-    if (velocity > 0 && current > previous) {
-      return current >= STRONG_THRESHOLD ? 'strengthening' : 'recovering'
+    if (currentStrength > previousStrength) {
+      return currentStrength >= STRONG_THRESHOLD ? 'strengthening' : 'recovering'
     }
-    if (velocity < 0 && current < previous) {
-      return current <= WEAK_THRESHOLD ? 'breaking_down' : 'weakening'
+    if (currentStrength < previousStrength) {
+      return currentStrength <= WEAK_THRESHOLD ? 'breaking_down' : 'weakening'
     }
   }
 
-  if (Math.abs(current) >= STRONG_THRESHOLD) {
+  if (currentStrength >= STRONG_THRESHOLD) {
     return 'stable_strong'
   }
-  if (Math.abs(current) <= WEAK_THRESHOLD) {
+  if (currentStrength <= WEAK_THRESHOLD) {
     return 'stable_weak'
   }
 

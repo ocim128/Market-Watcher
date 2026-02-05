@@ -8,6 +8,7 @@ import { TableCell } from '@/components/ui/table'
 import { Sparkline } from '@/components/ui/sparkline'
 import { calculateSpread } from '@/lib/analysis/statistics'
 import { motion } from 'framer-motion'
+import { getTradingViewSymbol, type ExchangeType } from '@/config'
 import type { PairAnalysisResult } from '@/types'
 import {
   getSignalBadgeClass,
@@ -24,6 +25,7 @@ import {
 
 interface PairRowProps {
   pair: PairAnalysisResult
+  currentExchange: ExchangeType
   currentPrimaryPair: string
   primaryPrices: number[]
   pairPrices: number[]
@@ -166,7 +168,15 @@ function OpportunityCell({ score }: { score: number }) {
   )
 }
 
-function ActionsCell({ symbol, onSelect }: { symbol: string; onSelect: () => void }) {
+function ActionsCell({
+  symbol,
+  exchange,
+  onSelect,
+}: {
+  symbol: string
+  exchange: ExchangeType
+  onSelect: () => void
+}) {
   return (
     <TableCell>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
@@ -189,7 +199,10 @@ function ActionsCell({ symbol, onSelect }: { symbol: string; onSelect: () => voi
           title="Open in TradingView"
           onClick={e => {
             e.stopPropagation()
-            window.open(`https://www.tradingview.com/chart/?symbol=BINANCE:${symbol}`, '_blank')
+            window.open(
+              `https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(exchange, symbol)}`,
+              '_blank'
+            )
           }}
         >
           <ExternalLink className="h-4 w-4" />
@@ -201,6 +214,7 @@ function ActionsCell({ symbol, onSelect }: { symbol: string; onSelect: () => voi
 
 export function PairRow({
   pair,
+  currentExchange,
   currentPrimaryPair,
   primaryPrices,
   pairPrices,
@@ -228,7 +242,7 @@ export function PairRow({
       <RegimeCell regime={pair.correlationVelocity.regime} />
       <ConfluenceCell rating={pair.confluence.rating} label={pair.confluence.ratingLabel} />
       <OpportunityCell score={pair.opportunityScore} />
-      <ActionsCell symbol={pair.symbol} onSelect={onSelect} />
+      <ActionsCell symbol={pair.symbol} exchange={currentExchange} onSelect={onSelect} />
     </motion.tr>
   )
 }

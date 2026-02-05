@@ -130,14 +130,22 @@ export function calculateRatio(primary: number[], secondary: number[]): number[]
   return ratio
 }
 
+interface AlignSeriesOptions {
+  requirePositive?: boolean
+}
+
 /**
- * Align two series by dropping entries where either value is not finite
+ * Align two series by dropping entries where either value is invalid.
+ * By default, non-positive values are also removed because downstream
+ * calculations use logarithms.
  * Returns aligned arrays and count of dropped entries
  */
 export function alignSeries(
   primary: number[],
-  secondary: number[]
+  secondary: number[],
+  options: AlignSeriesOptions = {}
 ): { primary: number[]; secondary: number[]; droppedCount: number } {
+  const { requirePositive = true } = options
   const length = Math.min(primary.length, secondary.length)
   const alignedPrimary: number[] = []
   const alignedSecondary: number[] = []
@@ -146,8 +154,9 @@ export function alignSeries(
   for (let i = 0; i < length; i++) {
     const p = primary[i]
     const s = secondary[i]
-    // Skip if either value is not finite (NaN, Infinity, etc.)
-    if (!Number.isFinite(p) || !Number.isFinite(s)) {
+    const invalidValue =
+      !Number.isFinite(p) || !Number.isFinite(s) || (requirePositive && (p <= 0 || s <= 0))
+    if (invalidValue) {
       droppedCount++
       continue
     }

@@ -71,7 +71,7 @@ export function calculateVolatilityAdjustedSpread(
   const signalStrength = clamp((1 - 1 / (1 + absAdjustedZ * 0.5)) * 100, 0, 85)
 
   // Determine signal quality
-  const signalQuality = determineSignalQuality(adjustedZScore, rawZScore, combinedVolatility)
+  const signalQuality = determineSignalQuality(adjustedZScore, combinedVolatility)
 
   return {
     rawZScore,
@@ -87,11 +87,7 @@ export function calculateVolatilityAdjustedSpread(
 /**
  * Determine signal quality based on adjusted Z-score and volatility
  */
-function determineSignalQuality(
-  adjustedZ: number,
-  rawZ: number,
-  volatility: number
-): SignalQuality {
+function determineSignalQuality(adjustedZ: number, volatility: number): SignalQuality {
   const absAdjusted = Math.abs(adjustedZ)
 
   // High spread, low volatility = premium signal

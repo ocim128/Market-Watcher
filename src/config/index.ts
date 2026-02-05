@@ -19,6 +19,21 @@ export const PRESET_BARS = [
   { value: 2000, label: '2000' },
 ] as const
 
+export const AVAILABLE_EXCHANGES = [
+  {
+    value: 'binance_spot',
+    label: 'Binance Spot',
+    description: 'Spot pairs from Binance',
+  },
+  {
+    value: 'tradfi',
+    label: 'TradFi',
+    description: 'TradFi symbols from Bybit MT5 feed',
+  },
+] as const
+
+export type ExchangeType = (typeof AVAILABLE_EXCHANGES)[number]['value']
+
 export const AVAILABLE_PRIMARY_PAIRS = [
   { value: 'BTCUSDT', label: 'BTC/USDT', description: 'Bitcoin - Market leader' },
   { value: 'ETHUSDT', label: 'ETH/USDT', description: 'Ethereum - DeFi standard' },
@@ -32,7 +47,17 @@ export const AVAILABLE_PRIMARY_PAIRS = [
   { value: 'MATICUSDT', label: 'MATIC/USDT', description: 'Polygon' },
 ] as const
 
-export type PrimaryPairType = (typeof AVAILABLE_PRIMARY_PAIRS)[number]['value']
+export const AVAILABLE_TRADFI_PRIMARY_PAIRS = [
+  { value: 'TSLA', label: 'TSLA', description: 'Tesla' },
+  { value: 'AAPL', label: 'AAPL', description: 'Apple' },
+  { value: 'NAS100', label: 'NAS100', description: 'Nasdaq 100 Index' },
+  { value: 'SP500', label: 'SP500', description: 'S&P 500 Index' },
+  { value: 'XAUUSD+', label: 'XAUUSD+', description: 'Gold vs USD' },
+] as const
+
+export type PrimaryPairType =
+  | (typeof AVAILABLE_PRIMARY_PAIRS)[number]['value']
+  | (typeof AVAILABLE_TRADFI_PRIMARY_PAIRS)[number]['value']
 
 // Define IntervalType from AVAILABLE_INTERVALS
 export type IntervalType = (typeof AVAILABLE_INTERVALS)[number]['value']
@@ -44,6 +69,7 @@ export const config = {
 
   // Primary pair to compare against
   primaryPair: 'ETHUSDT',
+  exchange: 'binance_spot' as ExchangeType,
 
   // Kline settings (defaults)
   interval: '1m' as IntervalType, // 1m for scalping
@@ -52,7 +78,7 @@ export const config = {
   maxBars: 10000, // Maximum allowed bars
 
   // Scanning
-  topPairsLimit: 120, // Number of top USDT pairs to analyze
+  topPairsLimit: 120, // Binance-only: number of top USDT pairs to analyze
   scanDelayMs: 50, // Delay between API calls (faster for 1m data)
 
   // Refresh - shorter for 1m scalping
@@ -87,6 +113,17 @@ export const config = {
 }
 
 export type Config = typeof config
+
+export function getExchangeLabel(exchange: ExchangeType): string {
+  return AVAILABLE_EXCHANGES.find(e => e.value === exchange)?.label || exchange
+}
+
+export function getTradingViewSymbol(exchange: ExchangeType, symbol: string): string {
+  if (exchange === 'tradfi') {
+    return symbol
+  }
+  return `BINANCE:${symbol}`
+}
 
 /**
  * Get array of interval values for confluence analysis

@@ -10,7 +10,13 @@
  * - If spread < -threshold: LONG primary, SHORT secondary (expect mean reversion up)
  */
 
-import { mean, standardDeviation, pearsonCorrelation, calculateReturns } from './statistics'
+import {
+  mean,
+  standardDeviation,
+  pearsonCorrelation,
+  calculateReturns,
+  alignSeries,
+} from './statistics'
 import type {
   BacktestConfig,
   BacktestResult,
@@ -23,6 +29,7 @@ import { DEFAULT_BACKTEST_CONFIG, createEmptyBacktestResult } from '@/types/back
 
 // Lookback window for rolling Z-score calculations
 const ROLLING_WINDOW = 100
+const EPSILON = 1e-12
 
 /**
  * Calculate rolling Z-score of the log spread
@@ -37,7 +44,9 @@ function calculateRollingSpreadZScore(
   const spreads: number[] = []
 
   for (let i = startIdx; i <= index; i++) {
-    const logSpread = Math.log(primaryCloses[i]) - Math.log(secondaryCloses[i])
+    const logSpread =
+      Math.log(Math.max(EPSILON, primaryCloses[i])) -
+      Math.log(Math.max(EPSILON, secondaryCloses[i]))
     spreads.push(logSpread)
   }
 
@@ -145,8 +154,11 @@ function runBacktestIteration(
   let inPosition = false
   let currentTrade: Partial<Trade> | null = null
 
-  for (let i = ROLLING_WINDOW; i < minLength; i++) {
+  for (let i = ROLLING_WINDOW - 1; i < minLength; i++) {
     const spreadZ = calculateRollingSpreadZScore(primaryCloses, secondaryCloses, i, ROLLING_WINDOW)
+    if (!Number.isFinite(spreadZ)) {
+      continue
+    }
 
     if (!inPosition) {
       const { shouldEnter, direction } = checkEntryCondition(
@@ -172,6 +184,9 @@ function runBacktestIteration(
         primaryCloses[i],
         secondaryCloses[i]
       )
+      if (!Number.isFinite(currentPnL)) {
+        continue
+      }
 
       const exitReason = checkExitCondition(currentPnL, config)
       if (exitReason) {
@@ -229,14 +244,17 @@ export function runBacktest(
   config: Partial<BacktestConfig> = {}
 ): BacktestResult {
   const fullConfig: BacktestConfig = { ...DEFAULT_BACKTEST_CONFIG, ...config }
-  const minLength = Math.min(primaryCloses.length, secondaryCloses.length)
+  const { primary: alignedPrimary, secondary: alignedSecondary } = alignSeries(
+    primaryCloses,
+    secondaryCloses,
+    { requirePositive: true }
+  )
+  const minLength = Math.min(alignedPrimary.length, alignedSecondary.length)
 
   if (minLength < ROLLING_WINDOW + 10) {
     return createEmptyBacktestResult(symbol, primarySymbol, fullConfig)
   }
 
-  const alignedPrimary = primaryCloses.slice(-minLength)
-  const alignedSecondary = secondaryCloses.slice(-minLength)
   const overallCorrelation = pearsonCorrelation(
     calculateReturns(alignedPrimary),
     calculateReturns(alignedSecondary)
@@ -248,8 +266,8 @@ export function runBacktest(
 
   const trades: Trade[] = []
   runBacktestIteration(
-    primaryCloses,
-    secondaryCloses,
+    alignedPrimary,
+    alignedSecondary,
     minLength,
     fullConfig,
     overallCorrelation,

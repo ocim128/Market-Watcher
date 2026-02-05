@@ -8,6 +8,7 @@ function useScanState() {
   const results = useScanStore(state => state.results)
   const analysisResults = useScanStore(state => state.analysisResults)
   const currentPrimaryPair = useScanStore(state => state.currentPrimaryPair)
+  const currentExchange = useScanStore(state => state.currentExchange)
   const lastScanTime = useScanStore(state => state.lastScanTime)
   const isScanning = useScanStore(state => state.isScanning)
   const isAnalyzing = useScanStore(state => state.isAnalyzing)
@@ -19,6 +20,7 @@ function useScanState() {
     results,
     analysisResults,
     currentPrimaryPair,
+    currentExchange,
     lastScanTime,
     isScanning,
     isAnalyzing,
@@ -34,6 +36,7 @@ function useScanActions() {
   const setResults = useScanStore(state => state.setResults)
   const setAnalysisResults = useScanStore(state => state.setAnalysisResults)
   const setCurrentPrimaryPair = useScanStore(state => state.setCurrentPrimaryPair)
+  const setCurrentExchange = useScanStore(state => state.setCurrentExchange)
   const updateScanProgress = useScanStore(state => state.updateScanProgress)
   const startAnalysis = useScanStore(state => state.startAnalysis)
   const completeAnalysis = useScanStore(state => state.completeAnalysis)
@@ -46,6 +49,7 @@ function useScanActions() {
     setResults,
     setAnalysisResults,
     setCurrentPrimaryPair,
+    setCurrentExchange,
     updateScanProgress,
     startAnalysis,
     completeAnalysis,
@@ -61,14 +65,18 @@ export function useScan() {
   const scan = useCallback(
     async (options: ScanOptions = {}): Promise<ScanResult[]> => {
       const primaryPair = options.primaryPair || state.currentPrimaryPair
+      const exchange = options.exchange || state.currentExchange
 
       if (options.primaryPair && options.primaryPair !== state.currentPrimaryPair) {
         actions.setCurrentPrimaryPair(options.primaryPair)
       }
+      if (options.exchange && options.exchange !== state.currentExchange) {
+        actions.setCurrentExchange(options.exchange)
+      }
 
       actions.startScan()
       const { results: scanResults, error } = await executeScan(
-        options,
+        { ...options, exchange },
         queryClient,
         actions.updateScanProgress
       )
@@ -92,7 +100,7 @@ export function useScan() {
 
       return scanResults
     },
-    [queryClient, state.currentPrimaryPair, actions]
+    [queryClient, state.currentExchange, state.currentPrimaryPair, actions]
   )
 
   const analyze = useCallback(() => {
@@ -115,6 +123,7 @@ export function useScan() {
   return {
     ...state,
     setCurrentPrimaryPair: actions.setCurrentPrimaryPair,
+    setCurrentExchange: actions.setCurrentExchange,
     scan,
     analyze,
     reset: actions.reset,

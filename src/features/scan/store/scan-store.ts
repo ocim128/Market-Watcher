@@ -1,12 +1,13 @@
 /**
  * Scan Store - Zustand state management for pair scanning
  *
- * This store manages the state for scanning trading pairs from Binance,
+ * This store manages the state for scanning trading pairs from supported sources,
  * caching results, and analyzing them for trading opportunities.
  */
 
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { config, type ExchangeType } from '@/config'
 import type { ScanProgress, BinanceKline, PairAnalysisResult } from '@/types'
 
 export interface ScanResult {
@@ -20,6 +21,7 @@ export interface ScanOptions {
   interval?: string
   totalBars?: number
   primaryPair?: string
+  exchange?: ExchangeType
   concurrency?: number
   includePrimary?: boolean
   autoAnalyze?: boolean
@@ -31,6 +33,7 @@ interface ScanState {
   results: ScanResult[]
   analysisResults: PairAnalysisResult[]
   currentPrimaryPair: string
+  currentExchange: ExchangeType
   lastScanTime: Date | null
 
   // Loading states
@@ -48,6 +51,7 @@ interface ScanActions {
   setResults: (results: ScanResult[]) => void
   setAnalysisResults: (results: PairAnalysisResult[]) => void
   setCurrentPrimaryPair: (pair: string) => void
+  setCurrentExchange: (exchange: ExchangeType) => void
   setIsAnalyzing: (isAnalyzing: boolean) => void
   setLastScanTime: (time: Date | null) => void
 
@@ -76,7 +80,8 @@ const initialState: Omit<ScanState, keyof ScanActions> = {
   progress: initialProgress,
   results: [],
   analysisResults: [],
-  currentPrimaryPair: 'ETHUSDT',
+  currentPrimaryPair: config.primaryPair,
+  currentExchange: config.exchange,
   lastScanTime: null,
   isAnalyzing: false,
   isScanning: false,
@@ -103,6 +108,8 @@ export const useScanStore = create<ScanState & ScanActions>()(
       setAnalysisResults: analysisResults => set({ analysisResults }),
 
       setCurrentPrimaryPair: currentPrimaryPair => set({ currentPrimaryPair }),
+
+      setCurrentExchange: currentExchange => set({ currentExchange }),
 
       setIsAnalyzing: isAnalyzing => set({ isAnalyzing }),
 
@@ -166,6 +173,7 @@ export const selectScanProgress = (state: ScanState & ScanActions) => state.prog
 export const selectScanResults = (state: ScanState & ScanActions) => state.results
 export const selectAnalysisResults = (state: ScanState & ScanActions) => state.analysisResults
 export const selectCurrentPrimaryPair = (state: ScanState & ScanActions) => state.currentPrimaryPair
+export const selectCurrentExchange = (state: ScanState & ScanActions) => state.currentExchange
 export const selectIsScanning = (state: ScanState & ScanActions) => state.isScanning
 export const selectIsAnalyzing = (state: ScanState & ScanActions) => state.isAnalyzing
 export const selectIsComplete = (state: ScanState & ScanActions) => state.isComplete

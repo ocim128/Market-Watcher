@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { config } from '@/config'
+import { config, type ExchangeType } from '@/config'
 import {
   getTopUsdtPairs,
   fetchKlinesPaged,
@@ -12,9 +12,11 @@ import type { BinanceKline } from '@/types'
 
 // Query keys for cache management
 export const queryKeys = {
-  topPairs: ['binance', 'topPairs'] as const,
-  klines: (symbol: string, interval: string) => ['binance', 'klines', symbol, interval] as const,
-  allKlines: (interval: string) => ['binance', 'allKlines', interval] as const,
+  topPairs: (exchange: ExchangeType = config.exchange) => [exchange, 'topPairs'] as const,
+  klines: (symbol: string, interval: string, exchange: ExchangeType = config.exchange) =>
+    [exchange, 'klines', symbol, interval] as const,
+  allKlines: (interval: string, exchange: ExchangeType = config.exchange) =>
+    [exchange, 'allKlines', interval] as const,
 }
 
 /**
@@ -22,7 +24,7 @@ export const queryKeys = {
  */
 export function useTopPairs(limit: number = config.topPairsLimit) {
   return useQuery({
-    queryKey: [...queryKeys.topPairs, limit],
+    queryKey: [...queryKeys.topPairs('binance_spot'), limit],
     queryFn: () => getTopUsdtPairs(limit),
     staleTime: 30 * 60 * 1000, // 30 minutes - pairs don't change often
     gcTime: 60 * 60 * 1000, // 1 hour

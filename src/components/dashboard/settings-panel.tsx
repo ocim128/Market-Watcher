@@ -1,7 +1,8 @@
 /* eslint-disable max-lines */
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Settings,
   RefreshCw,
@@ -18,13 +19,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAutoRefresh } from '@/hooks/use-auto-refresh'
 import { useNotifications } from '@/hooks/use-notifications'
+import { getTradFiPairs } from '@/lib/tradfi'
 import {
   config,
+  AVAILABLE_EXCHANGES,
   AVAILABLE_INTERVALS,
   PRESET_BARS,
   AVAILABLE_PRIMARY_PAIRS,
+  AVAILABLE_TRADFI_PRIMARY_PAIRS,
   getTimeDescription,
   getIntervalUseCase,
+  type ExchangeType,
   type IntervalType,
 } from '@/config'
 
@@ -32,11 +37,13 @@ interface SettingsPanelProps {
   isOpen: boolean
   onClose: () => void
   scanSettings: {
+    exchange: ExchangeType
     interval: IntervalType
     totalBars: number
     primaryPair: string
   }
   onScanSettingsChange: (settings: {
+    exchange: ExchangeType
     interval: IntervalType
     totalBars: number
     primaryPair: string
@@ -95,32 +102,141 @@ function useSettingsPanelState(
   }
 }
 
+function usePrimaryPairOptions(exchange: ExchangeType) {
+  const tradfiPairsQuery = useQuery({
+    queryKey: ['tradfi', 'pairs'],
+    queryFn: () => getTradFiPairs(),
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    enabled: exchange === 'tradfi',
+  })
+
+  const options = useMemo<PairOption[]>(() => {
+    if (exchange === 'tradfi') {
+      if (tradfiPairsQuery.data && tradfiPairsQuery.data.length > 0) {
+        return tradfiPairsQuery.data.map(symbol => ({
+          value: symbol,
+          label: symbol,
+          description: 'TradFi',
+        }))
+      }
+      return AVAILABLE_TRADFI_PRIMARY_PAIRS.map(pair => ({
+        value: pair.value,
+        label: pair.label,
+        description: pair.description,
+      }))
+    }
+
+    return AVAILABLE_PRIMARY_PAIRS.map(pair => ({
+      value: pair.value,
+      label: pair.label,
+      description: pair.description,
+    }))
+  }, [tradfiPairsQuery.data, exchange])
+
+  return {
+    options,
+    isLoading: exchange === 'tradfi' && tradfiPairsQuery.isLoading,
+  }
+}
+
 interface PrimaryPairSelectorProps {
   value: string
   onChange: (value: string) => void
+  options: PairOption[]
+  isLoading: boolean
 }
 
-function PrimaryPairSelector({ value, onChange }: PrimaryPairSelectorProps) {
+interface PairOption {
+  value: string
+  label: string
+  description: string
+}
+
+interface ExchangeSelectorProps {
+  value: ExchangeType
+  onChange: (value: ExchangeType) => void
+}
+
+function ExchangeSelector({ value, onChange }: ExchangeSelectorProps) {
   return (
     <div className="space-y-1">
-      {AVAILABLE_PRIMARY_PAIRS.map(pair => (
+      {AVAILABLE_EXCHANGES.map(exchange => (
         <button
-          key={pair.value}
-          onClick={() => onChange(pair.value)}
+          key={exchange.value}
+          onClick={() => onChange(exchange.value)}
           className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
-            value === pair.value
-              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+            value === exchange.value
+              ? 'bg-primary text-primary-foreground'
               : 'bg-secondary/50 hover:bg-secondary'
           }`}
         >
-          <span className="font-medium font-mono">{pair.label}</span>
+          <span className="font-medium">{exchange.label}</span>
           <span
-            className={`text-xs ${value === pair.value ? 'text-white/80' : 'text-muted-foreground'}`}
+            className={`text-xs ${value === exchange.value ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
           >
-            {pair.description}
+            {exchange.description}
           </span>
         </button>
       ))}
+    </div>
+  )
+}
+
+function PrimaryPairSelector({ value, onChange, options, isLoading }: PrimaryPairSelectorProps) {
+  const [search, setSearch] = useState('')
+
+  const visibleOptions = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const filtered = query
+      ? options.filter(
+          pair =>
+            pair.value.toLowerCase().includes(query) || pair.label.toLowerCase().includes(query)
+        )
+      : options
+
+    return filtered.slice(0, 120)
+  }, [options, search])
+
+  return (
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search pair (e.g. BTCUSDT)"
+        className="w-full px-3 py-1.5 bg-secondary rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+
+      <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+        {isLoading && (
+          <p className="text-xs text-muted-foreground px-2 py-1">Loading exchange pairs...</p>
+        )}
+
+        {!isLoading &&
+          visibleOptions.map(pair => (
+            <button
+              key={pair.value}
+              onClick={() => onChange(pair.value)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
+                value === pair.value
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                  : 'bg-secondary/50 hover:bg-secondary'
+              }`}
+            >
+              <span className="font-medium font-mono">{pair.label}</span>
+              <span
+                className={`text-xs ${value === pair.value ? 'text-white/80' : 'text-muted-foreground'}`}
+              >
+                {pair.description}
+              </span>
+            </button>
+          ))}
+
+        {!isLoading && visibleOptions.length === 0 && (
+          <p className="text-xs text-muted-foreground px-2 py-1">No pair matches your search.</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -216,6 +332,8 @@ function TimeInfo({ timeDescription, useCaseDescription }: TimeInfoProps) {
 function ScanSettingsSection({
   scanSettings,
   onScanSettingsChange,
+  pairOptions,
+  isPairLoading,
   customBars,
   timeDescription,
   useCaseDescription,
@@ -224,6 +342,8 @@ function ScanSettingsSection({
 }: {
   scanSettings: SettingsPanelProps['scanSettings']
   onScanSettingsChange: SettingsPanelProps['onScanSettingsChange']
+  pairOptions: PairOption[]
+  isPairLoading: boolean
   customBars: string
   timeDescription: string
   useCaseDescription: string
@@ -238,12 +358,22 @@ function ScanSettingsSection({
       </h4>
 
       <div>
+        <label className="text-xs text-muted-foreground block mb-2">Pair Source</label>
+        <ExchangeSelector
+          value={scanSettings.exchange}
+          onChange={value => onScanSettingsChange({ ...scanSettings, exchange: value })}
+        />
+      </div>
+
+      <div>
         <label className="text-xs text-muted-foreground block mb-2">
           <GitCompare className="h-3 w-3 inline mr-1" />
           Primary Pair (Reference)
         </label>
         <PrimaryPairSelector
           value={scanSettings.primaryPair}
+          options={pairOptions}
+          isLoading={isPairLoading}
           onChange={value => onScanSettingsChange({ ...scanSettings, primaryPair: value })}
         />
         <p className="text-xs text-muted-foreground mt-2">
@@ -404,10 +534,14 @@ function CurrentConfig({ scanSettings }: { scanSettings: SettingsPanelProps['sca
     <div className="space-y-2 text-xs text-muted-foreground">
       <h4 className="text-sm font-medium text-foreground">Current Config</h4>
       <div className="grid grid-cols-2 gap-1">
+        <span>Pair Source:</span>
+        <span className="font-mono">{scanSettings.exchange}</span>
         <span>Primary Pair:</span>
         <span className="font-mono text-primary">{scanSettings.primaryPair}</span>
-        <span>Top Pairs:</span>
-        <span className="font-mono">{config.topPairsLimit}</span>
+        <span>Scan Universe:</span>
+        <span className="font-mono">
+          {scanSettings.exchange === 'tradfi' ? 'All TradFi pairs' : `Top ${config.topPairsLimit}`}
+        </span>
       </div>
     </div>
   )
@@ -419,6 +553,10 @@ export function SettingsPanel({
   scanSettings,
   onScanSettingsChange,
 }: SettingsPanelProps) {
+  const { options: pairOptions, isLoading: isPairLoading } = usePrimaryPairOptions(
+    scanSettings.exchange
+  )
+
   const {
     isAutoRefreshEnabled,
     toggleAutoRefresh,
@@ -436,6 +574,17 @@ export function SettingsPanel({
     handleBarsChange,
     handlePresetBars,
   } = useSettingsPanelState(scanSettings, onScanSettingsChange)
+
+  useEffect(() => {
+    if (pairOptions.length === 0) {
+      return
+    }
+
+    const exists = pairOptions.some(pair => pair.value === scanSettings.primaryPair)
+    if (!exists) {
+      onScanSettingsChange({ ...scanSettings, primaryPair: pairOptions[0].value })
+    }
+  }, [pairOptions, scanSettings, onScanSettingsChange])
 
   if (!isOpen) {
     return null
@@ -467,6 +616,8 @@ export function SettingsPanel({
           <ScanSettingsSection
             scanSettings={scanSettings}
             onScanSettingsChange={onScanSettingsChange}
+            pairOptions={pairOptions}
+            isPairLoading={isPairLoading}
             customBars={customBars}
             timeDescription={timeDescription}
             useCaseDescription={useCaseDescription}

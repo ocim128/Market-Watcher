@@ -11,6 +11,7 @@ import { PriceComparisonChart } from '@/components/charts/price-comparison-chart
 import { BacktestPanel } from '@/components/dashboard/backtest-panel'
 import { useScan } from '@/components/scan-context'
 import { calculateSpread, pearsonCorrelation, calculateReturns } from '@/lib/analysis'
+import { getTradingViewSymbol, type ExchangeType } from '@/config'
 import type { PairAnalysisResult, SignalQuality } from '@/types'
 
 interface PairDetailModalProps {
@@ -312,10 +313,12 @@ function KeyMetrics({ pair }: { pair: PairAnalysisResult }) {
 function ModalHeader({
   pair,
   primaryPair,
+  exchange,
   onClose,
 }: {
   pair: PairAnalysisResult
   primaryPair: string
+  exchange: ExchangeType
   onClose: () => void
 }) {
   return (
@@ -339,7 +342,7 @@ function ModalHeader({
           className="gap-1"
           onClick={() =>
             window.open(
-              `https://www.tradingview.com/chart/?symbol=BINANCE:${pair.symbol}`,
+              `https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(exchange, pair.symbol)}`,
               '_blank'
             )
           }
@@ -403,7 +406,7 @@ function ChartsSection({
 }
 
 export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
-  const { currentPrimaryPair } = useScan()
+  const { currentPrimaryPair, currentExchange } = useScan()
   const chartData = useChartData(pair)
 
   return (
@@ -412,7 +415,12 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
         className="bg-card border rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <ModalHeader pair={pair} primaryPair={currentPrimaryPair} onClose={onClose} />
+        <ModalHeader
+          pair={pair}
+          primaryPair={currentPrimaryPair}
+          exchange={currentExchange}
+          onClose={onClose}
+        />
 
         <div className="p-4 space-y-6">
           <KeyMetrics pair={pair} />

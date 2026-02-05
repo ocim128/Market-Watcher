@@ -35,6 +35,7 @@ export function PairsTable() {
     progress,
     lastScanTime,
     currentPrimaryPair,
+    currentExchange,
   } = useScan()
 
   // Local state for selected pair
@@ -94,6 +95,7 @@ export function PairsTable() {
                       <PairRow
                         key={pair.symbol}
                         pair={pair}
+                        currentExchange={currentExchange}
                         currentPrimaryPair={currentPrimaryPair}
                         primaryPrices={primaryPrices}
                         pairPrices={priceMap.get(pair.symbol) || []}
