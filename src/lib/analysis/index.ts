@@ -9,6 +9,18 @@ export { calculateVolatilityAdjustedSpread } from './volatility-spread'
 export { buildNotes } from './notes-builder'
 export { runBacktest, runBacktestAllPairs } from './backtest-engine'
 export { optimizeParameters, buildPriceData } from './walk-forward-optimization'
+export {
+  analyzeMeanReversion,
+  calculateRollingBetaSpread,
+  runAdfTest,
+  estimateHalfLife,
+} from './mean-reversion'
+export type {
+  MeanReversionAnalysis,
+  MeanReversionOptions,
+  AdfTestResult,
+  CointegrationTestResult,
+} from './mean-reversion'
 
 export {
   mean,

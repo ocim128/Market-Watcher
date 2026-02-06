@@ -2,6 +2,7 @@
 
 export interface PairAnalysisResult {
   // Metadata
+  pairKey: string
   symbol: string
   primarySymbol: string
   timestamp: number
@@ -11,11 +12,14 @@ export interface PairAnalysisResult {
   spreadMean: number
   spreadStd: number
   spreadZScore: number
+  hedgeRatioBeta: number
+  stationarity: StationarityAnalysis
   ratio: number
   alignedBars: number
 
   // Opportunity scoring
   opportunityScore: number
+  reversionProbability: ReversionProbability
   spreadOpportunity: number
   methodAverage: number
 
@@ -48,6 +52,26 @@ export interface CorrelationVelocityResult {
   velocity: number
   acceleration: number
   regime: CorrelationRegime
+}
+
+export interface StationarityAnalysis {
+  adfTStat: number
+  adfCriticalValue: number
+  adfPassed: boolean
+  cointegrationTStat: number
+  cointegrationCriticalValue: number
+  cointegrationPassed: boolean
+  halfLifeBars: number
+  halfLifePassed: boolean
+  isTradable: boolean
+}
+
+export interface ReversionProbability {
+  probability: number // 0..1
+  lookaheadBars: number
+  sampleSize: number
+  wins: number
+  method: 'history' | 'fallback'
 }
 
 // ============================================================================
@@ -154,21 +178,13 @@ export interface FilterOptions {
 }
 
 export const DEFAULT_FILTER_OPTIONS: FilterOptions = {
-  minCorrelation: 0,
+  minCorrelation: 0.4,
   maxCorrelation: 1,
-  minZScore: 0,
-  minOpportunity: 0,
-  minConfluence: 0,
-  signalQualities: ['premium', 'strong', 'moderate', 'weak', 'noisy'],
-  regimes: [
-    'stable_strong',
-    'stable_weak',
-    'stable',
-    'strengthening',
-    'recovering',
-    'weakening',
-    'breaking_down',
-  ],
+  minZScore: 1.2,
+  minOpportunity: 45,
+  minConfluence: 2,
+  signalQualities: ['premium', 'strong', 'moderate'],
+  regimes: ['stable_strong', 'strengthening', 'recovering', 'stable'],
 }
 
 // Multi-Timeframe Confluence Types
@@ -268,6 +284,7 @@ export interface HistoricalSignal {
 
 export interface AppConfig {
   primaryPair: string
+  scanMode: 'primary_vs_all' | 'all_vs_all'
   interval: string
   totalBars: number
   topPairsLimit: number
@@ -276,8 +293,9 @@ export interface AppConfig {
 
 export const DEFAULT_CONFIG: AppConfig = {
   primaryPair: 'ETHUSDT',
+  scanMode: 'primary_vs_all',
   interval: '1h',
-  totalBars: 500,
+  totalBars: 1500,
   topPairsLimit: 120,
   refreshIntervalMs: 10 * 60 * 1000,
 }

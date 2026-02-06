@@ -112,7 +112,10 @@ function useOpportunitySummary() {
       extremeZCount,
       avgOpportunity,
       topOpportunity: topResult
-        ? { symbol: topResult.symbol, score: topResult.opportunityScore }
+        ? {
+            symbol: `${topResult.primarySymbol.replace('USDT', '')}/${topResult.symbol.replace('USDT', '')}`,
+            score: topResult.opportunityScore,
+          }
         : null,
     }
   }, [analysisResults])
@@ -186,7 +189,7 @@ export function OpportunitySummary() {
           }
           description={
             stats.topOpportunity
-              ? `Top: ${stats.topOpportunity.symbol.replace('USDT', '')} (${stats.topOpportunity.score}%)`
+              ? `Top: ${stats.topOpportunity.symbol} (${stats.topOpportunity.score}%)`
               : 'Mean score across all pairs'
           }
           icon={<Percent className="h-4 w-4" />}

@@ -15,11 +15,18 @@ import type { Trade } from '@/types/backtest-types'
 
 interface BacktestPanelProps {
   symbol: string
+  primarySymbol?: string
 }
 
 function formatPercent(value: number, decimals: number = 2): string {
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value.toFixed(decimals)}%`
+}
+
+function parseInputNumber(raw: string): number {
+  const normalized = raw.replace(',', '.')
+  const value = Number.parseFloat(normalized)
+  return Number.isFinite(value) ? value : 0
 }
 
 function getTradeColor(trade: Trade): string {
@@ -62,7 +69,7 @@ function ConfigInput({ label, value, step, min, max, onChange }: ConfigInputProp
         min={min}
         max={max}
         value={value}
-        onChange={e => onChange(parseFloat(e.target.value) || 0)}
+        onChange={e => onChange(parseInputNumber(e.target.value))}
         className="w-full px-2 py-1 rounded bg-background border text-sm"
       />
     </div>
@@ -86,7 +93,7 @@ function BacktestConfig({
       <ConfigInput
         label="Entry Spread (|Z|)"
         value={config.entrySpreadThreshold}
-        step="0.5"
+        step="0.1"
         min={1}
         max={5}
         onChange={v => onChange({ entrySpreadThreshold: Math.abs(v) || 3 })}
@@ -322,7 +329,7 @@ interface PriceData {
   secondaryCloses: number[]
 }
 
-function useBacktestPanelState(symbol: string) {
+function useBacktestPanelState(symbol: string, primarySymbol?: string) {
   const { results, currentPrimaryPair } = useScan()
   const { config: btConfig, setConfig, result, isRunning, run, reset } = useBacktest()
   const {
@@ -336,8 +343,10 @@ function useBacktestPanelState(symbol: string) {
     resetOptimization,
   } = useOptimizedParams()
 
+  const activePrimarySymbol = primarySymbol ?? currentPrimaryPair
+
   const priceData: PriceData | null = useMemo(() => {
-    const primaryResult = results.find(r => r.symbol === currentPrimaryPair)
+    const primaryResult = results.find(r => r.symbol === activePrimarySymbol)
     const secondaryResult = results.find(r => r.symbol === symbol)
     if (!primaryResult || !secondaryResult) {
       return null
@@ -346,13 +355,13 @@ function useBacktestPanelState(symbol: string) {
       primaryCloses: primaryResult.closePrices,
       secondaryCloses: secondaryResult.closePrices,
     }
-  }, [results, symbol, currentPrimaryPair])
+  }, [results, symbol, activePrimarySymbol])
 
   const handleRun = () => {
     if (!priceData) {
       return
     }
-    run(priceData.primaryCloses, priceData.secondaryCloses, symbol, currentPrimaryPair)
+    run(priceData.primaryCloses, priceData.secondaryCloses, symbol, activePrimarySymbol, btConfig)
   }
 
   const handleOptimize = () => {
@@ -368,7 +377,7 @@ function useBacktestPanelState(symbol: string) {
 
   useEffect(() => {
     resetOptimization()
-  }, [symbol, currentPrimaryPair, resetOptimization])
+  }, [symbol, activePrimarySymbol, resetOptimization])
 
   return {
     btConfig,
@@ -378,7 +387,7 @@ function useBacktestPanelState(symbol: string) {
     reset,
     priceData,
     handleRun,
-    currentPrimaryPair,
+    activePrimarySymbol,
     optimizedParams,
     settings,
     isOptimizing,
@@ -434,7 +443,7 @@ function PanelHeader({
   )
 }
 
-export function BacktestPanel({ symbol }: BacktestPanelProps) {
+export function BacktestPanel({ symbol, primarySymbol }: BacktestPanelProps) {
   const {
     btConfig,
     setConfig,
@@ -443,7 +452,7 @@ export function BacktestPanel({ symbol }: BacktestPanelProps) {
     reset,
     priceData,
     handleRun,
-    currentPrimaryPair,
+    activePrimarySymbol,
     optimizedParams,
     settings,
     isOptimizing,
@@ -451,7 +460,7 @@ export function BacktestPanel({ symbol }: BacktestPanelProps) {
     setSettings,
     handleOptimize,
     handleApplyOptimized,
-  } = useBacktestPanelState(symbol)
+  } = useBacktestPanelState(symbol, primarySymbol)
 
   return (
     <Card className="mt-4">
@@ -480,7 +489,7 @@ export function BacktestPanel({ symbol }: BacktestPanelProps) {
           <>
             <ResultsSummary result={result} />
             <AdditionalStats result={result} />
-            <TradesTable trades={result.trades} symbol={symbol} primaryPair={currentPrimaryPair} />
+            <TradesTable trades={result.trades} symbol={symbol} primaryPair={activePrimarySymbol} />
           </>
         )}
 

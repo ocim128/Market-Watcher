@@ -16,6 +16,7 @@ export const PRESET_BARS = [
   { value: 200, label: '200' },
   { value: 500, label: '500' },
   { value: 1000, label: '1000' },
+  { value: 1500, label: '1500' },
   { value: 2000, label: '2000' },
 ] as const
 
@@ -33,6 +34,21 @@ export const AVAILABLE_EXCHANGES = [
 ] as const
 
 export type ExchangeType = (typeof AVAILABLE_EXCHANGES)[number]['value']
+
+export const AVAILABLE_SCAN_MODES = [
+  {
+    value: 'primary_vs_all',
+    label: 'Primary vs All',
+    description: 'Analyze one primary symbol against all scanned symbols',
+  },
+  {
+    value: 'all_vs_all',
+    label: 'All vs All',
+    description: 'Analyze every scanned symbol combination',
+  },
+] as const
+
+export type ScanMode = (typeof AVAILABLE_SCAN_MODES)[number]['value']
 
 export const AVAILABLE_PRIMARY_PAIRS = [
   { value: 'BTCUSDT', label: 'BTC/USDT', description: 'Bitcoin - Market leader' },
@@ -70,10 +86,11 @@ export const config = {
   // Primary pair to compare against
   primaryPair: 'ETHUSDT',
   exchange: 'binance_spot' as ExchangeType,
+  scanMode: 'primary_vs_all' as ScanMode,
 
   // Kline settings (defaults)
   interval: '1m' as IntervalType, // 1m for scalping
-  totalBars: 500, // ~8 hours at 1m, good for current regime
+  totalBars: 1500, // ~25 hours at 1m, balanced for regime detection
   batchSize: 1000, // Binance max per request
   maxBars: 10000, // Maximum allowed bars
 

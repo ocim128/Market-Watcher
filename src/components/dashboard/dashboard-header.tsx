@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Loader2, Settings, Clock, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useScan } from '@/components/scan-context'
@@ -13,10 +13,12 @@ import {
   getIntervalUseCase,
   type ExchangeType,
   type IntervalType,
+  type ScanMode,
 } from '@/config'
 
 interface ScanSettingsState {
   exchange: ExchangeType
+  scanMode: ScanMode
   interval: IntervalType
   totalBars: number
   primaryPair: string
@@ -25,10 +27,22 @@ interface ScanSettingsState {
 function useScanSettings() {
   const [scanSettings, setScanSettings] = useState<ScanSettingsState>({
     exchange: config.exchange,
+    scanMode: config.scanMode,
     interval: config.interval,
     totalBars: config.totalBars,
     primaryPair: config.primaryPair,
   })
+
+  useEffect(() => {
+    setScanSettings(prev => {
+      // One-time migration from legacy defaults used before the new recommended baseline.
+      const isLegacyBarsDefault = prev.totalBars === 500 || prev.totalBars === 1000
+      if (!isLegacyBarsDefault) {
+        return prev
+      }
+      return { ...prev, totalBars: config.totalBars }
+    })
+  }, [])
 
   return { scanSettings, setScanSettings }
 }
@@ -36,6 +50,7 @@ function useScanSettings() {
 function useHeaderScan(
   scanSettings: ScanSettingsState,
   setCurrentPrimaryPair: (pair: string) => void,
+  setCurrentScanMode: (mode: ScanMode) => void,
   setCurrentExchange: (exchange: ExchangeType) => void
 ) {
   const { scan } = useScan()
@@ -43,6 +58,7 @@ function useHeaderScan(
   return useCallback(async () => {
     try {
       setCurrentPrimaryPair(scanSettings.primaryPair)
+      setCurrentScanMode(scanSettings.scanMode)
       setCurrentExchange(scanSettings.exchange)
 
       const limit = scanSettings.exchange === 'tradfi' ? undefined : config.topPairsLimit
@@ -50,6 +66,7 @@ function useHeaderScan(
       await scan({
         limit,
         exchange: scanSettings.exchange,
+        scanMode: scanSettings.scanMode,
         interval: scanSettings.interval,
         totalBars: scanSettings.totalBars,
         primaryPair: scanSettings.primaryPair,
@@ -57,7 +74,7 @@ function useHeaderScan(
     } catch (error) {
       console.error('Scan failed:', error)
     }
-  }, [scan, scanSettings, setCurrentExchange, setCurrentPrimaryPair])
+  }, [scan, scanSettings, setCurrentExchange, setCurrentPrimaryPair, setCurrentScanMode])
 }
 
 function formatLastScanTime(lastScanTime: Date | null): string | null {
@@ -88,7 +105,11 @@ function ConfigSummary({ settings }: { settings: ScanSettingsState }) {
     <div className="flex items-center gap-2 text-xs">
       <span className="font-medium">{getExchangeLabel(settings.exchange)}</span>
       <span className="text-muted-foreground">|</span>
-      <span className="font-medium">{settings.primaryPair.replace('USDT', '')}</span>
+      <span className="font-medium">
+        {settings.scanMode === 'all_vs_all'
+          ? 'All vs All'
+          : settings.primaryPair.replace('USDT', '')}
+      </span>
       <span className="text-muted-foreground">|</span>
       <span>{getIntervalLabel(settings.interval)}</span>
       <span className="text-muted-foreground">|</span>
@@ -132,24 +153,37 @@ function ScanButton({ isScanning, onClick }: { isScanning: boolean; onClick: () 
 }
 
 export function DashboardHeader() {
-  const { isScanning, lastScanTime, setCurrentPrimaryPair, setCurrentExchange } = useScan()
+  const {
+    isScanning,
+    lastScanTime,
+    setCurrentPrimaryPair,
+    setCurrentScanMode,
+    setCurrentExchange,
+  } = useScan()
   const { scanSettings, setScanSettings } = useScanSettings()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  const handleScan = useHeaderScan(scanSettings, setCurrentPrimaryPair, setCurrentExchange)
+  const handleScan = useHeaderScan(
+    scanSettings,
+    setCurrentPrimaryPair,
+    setCurrentScanMode,
+    setCurrentExchange
+  )
 
   const handleScanSettingsChange = useCallback(
     (newSettings: {
       exchange: ExchangeType
+      scanMode: ScanMode
       interval: IntervalType
       totalBars: number
       primaryPair: string
     }) => {
       setScanSettings(newSettings)
       setCurrentExchange(newSettings.exchange)
+      setCurrentScanMode(newSettings.scanMode)
       setCurrentPrimaryPair(newSettings.primaryPair)
     },
-    [setCurrentExchange, setCurrentPrimaryPair, setScanSettings]
+    [setCurrentExchange, setCurrentScanMode, setCurrentPrimaryPair, setScanSettings]
   )
 
   return (

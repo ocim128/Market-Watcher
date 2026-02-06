@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { config } from '@/config'
 import { useScanStore, ScanOptions, ScanResult } from '../store/scan-store'
 import { executeScan, analyzeScanResults } from '../lib/scan-service'
 
@@ -8,6 +9,7 @@ function useScanState() {
   const results = useScanStore(state => state.results)
   const analysisResults = useScanStore(state => state.analysisResults)
   const currentPrimaryPair = useScanStore(state => state.currentPrimaryPair)
+  const currentScanMode = useScanStore(state => state.currentScanMode)
   const currentExchange = useScanStore(state => state.currentExchange)
   const lastScanTime = useScanStore(state => state.lastScanTime)
   const isScanning = useScanStore(state => state.isScanning)
@@ -20,6 +22,7 @@ function useScanState() {
     results,
     analysisResults,
     currentPrimaryPair,
+    currentScanMode,
     currentExchange,
     lastScanTime,
     isScanning,
@@ -36,6 +39,7 @@ function useScanActions() {
   const setResults = useScanStore(state => state.setResults)
   const setAnalysisResults = useScanStore(state => state.setAnalysisResults)
   const setCurrentPrimaryPair = useScanStore(state => state.setCurrentPrimaryPair)
+  const setCurrentScanMode = useScanStore(state => state.setCurrentScanMode)
   const setCurrentExchange = useScanStore(state => state.setCurrentExchange)
   const updateScanProgress = useScanStore(state => state.updateScanProgress)
   const startAnalysis = useScanStore(state => state.startAnalysis)
@@ -49,6 +53,7 @@ function useScanActions() {
     setResults,
     setAnalysisResults,
     setCurrentPrimaryPair,
+    setCurrentScanMode,
     setCurrentExchange,
     updateScanProgress,
     startAnalysis,
@@ -65,10 +70,14 @@ export function useScan() {
   const scan = useCallback(
     async (options: ScanOptions = {}): Promise<ScanResult[]> => {
       const primaryPair = options.primaryPair || state.currentPrimaryPair
+      const scanMode = options.scanMode || state.currentScanMode
       const exchange = options.exchange || state.currentExchange
 
       if (options.primaryPair && options.primaryPair !== state.currentPrimaryPair) {
         actions.setCurrentPrimaryPair(options.primaryPair)
+      }
+      if (options.scanMode && options.scanMode !== state.currentScanMode) {
+        actions.setCurrentScanMode(options.scanMode)
       }
       if (options.exchange && options.exchange !== state.currentExchange) {
         actions.setCurrentExchange(options.exchange)
@@ -92,7 +101,12 @@ export function useScan() {
       if (options.autoAnalyze !== false && scanResults.length > 0) {
         setTimeout(() => {
           actions.startAnalysis()
-          const analyzed = analyzeScanResults(scanResults, primaryPair)
+          const analyzed = analyzeScanResults(
+            scanResults,
+            primaryPair,
+            options.interval ?? config.interval,
+            scanMode
+          )
           actions.setAnalysisResults(analyzed)
           actions.completeAnalysis()
         }, 100)
@@ -100,7 +114,7 @@ export function useScan() {
 
       return scanResults
     },
-    [queryClient, state.currentExchange, state.currentPrimaryPair, actions]
+    [queryClient, state.currentExchange, state.currentPrimaryPair, state.currentScanMode, actions]
   )
 
   const analyze = useCallback(() => {
@@ -111,18 +125,24 @@ export function useScan() {
 
     actions.startAnalysis()
     try {
-      const analyzed = analyzeScanResults(state.results, state.currentPrimaryPair)
+      const analyzed = analyzeScanResults(
+        state.results,
+        state.currentPrimaryPair,
+        config.interval,
+        state.currentScanMode
+      )
       actions.setAnalysisResults(analyzed)
     } catch (error) {
       console.error('Analysis failed:', error)
     } finally {
       actions.completeAnalysis()
     }
-  }, [state.results, state.currentPrimaryPair, actions])
+  }, [state.results, state.currentPrimaryPair, state.currentScanMode, actions])
 
   return {
     ...state,
     setCurrentPrimaryPair: actions.setCurrentPrimaryPair,
+    setCurrentScanMode: actions.setCurrentScanMode,
     setCurrentExchange: actions.setCurrentExchange,
     scan,
     analyze,

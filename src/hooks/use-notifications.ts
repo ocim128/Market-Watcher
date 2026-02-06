@@ -16,7 +16,7 @@ function shouldNotify(pair: PairAnalysisResult, lastNotified: Set<string>): stri
   if (pair.confluence.rating < 2) {
     return null
   }
-  const notifyKey = `${pair.symbol}-${Math.floor(Date.now() / NOTIFICATION_COOLDOWN)}`
+  const notifyKey = `${pair.pairKey}-${Math.floor(Date.now() / NOTIFICATION_COOLDOWN)}`
   if (lastNotified.has(notifyKey)) {
     return null
   }
@@ -24,15 +24,13 @@ function shouldNotify(pair: PairAnalysisResult, lastNotified: Set<string>): stri
 }
 
 function createNotification(pair: PairAnalysisResult): Notification {
-  const notification = new Notification(
-    `💎 Premium Signal (Confluence ${pair.confluence.rating}/3)`,
-    {
-      body: `${pair.symbol.replace('USDT', '')}/USDT: Z-Score ${pair.spreadZScore.toFixed(2)}σ, Correlation ${pair.correlation.toFixed(2)}`,
-      icon: '/favicon.ico',
-      tag: pair.symbol,
-      requireInteraction: false,
-    }
-  )
+  const pairLabel = `${pair.primarySymbol.replace('USDT', '')}/${pair.symbol.replace('USDT', '')}`
+  const notification = new Notification(`Premium Signal (Confluence ${pair.confluence.rating}/3)`, {
+    body: `${pairLabel}: Z-Score ${pair.spreadZScore.toFixed(2)} sigma, Correlation ${pair.correlation.toFixed(2)}`,
+    icon: '/favicon.ico',
+    tag: pair.pairKey,
+    requireInteraction: false,
+  })
 
   notification.onclick = () => {
     window.focus()
@@ -111,13 +109,13 @@ export function useNotifications({
       const previousPremium = new Set(
         previousResults
           .filter(r => r.volatilitySpread.signalQuality === 'premium')
-          .map(r => r.symbol)
+          .map(r => r.pairKey)
       )
       const newPremiumSignals = results.filter(
         r =>
           r.volatilitySpread.signalQuality === 'premium' &&
           r.confluence.rating >= 2 &&
-          !previousPremium.has(r.symbol)
+          !previousPremium.has(r.pairKey)
       )
 
       newPremiumSignals.forEach(signal => notifyPremiumSignal(signal))

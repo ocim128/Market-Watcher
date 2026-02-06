@@ -62,10 +62,10 @@ interface ChartData {
 }
 
 function useChartData(pair: PairAnalysisResult): ChartData | null {
-  const { results, currentPrimaryPair } = useScan()
+  const { results } = useScan()
 
   return useMemo(() => {
-    const primaryResult = results.find(r => r.symbol === currentPrimaryPair)
+    const primaryResult = results.find(r => r.symbol === pair.primarySymbol)
     const secondaryResult = results.find(r => r.symbol === pair.symbol)
 
     if (!primaryResult || !secondaryResult) {
@@ -101,7 +101,7 @@ function useChartData(pair: PairAnalysisResult): ChartData | null {
       spread,
       rollingCorrelations,
     }
-  }, [results, pair.symbol, currentPrimaryPair])
+  }, [results, pair.symbol, pair.primarySymbol])
 }
 
 function ConfluenceSection({ pair }: { pair: PairAnalysisResult }) {
@@ -406,8 +406,9 @@ function ChartsSection({
 }
 
 export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
-  const { currentPrimaryPair, currentExchange } = useScan()
+  const { currentExchange } = useScan()
   const chartData = useChartData(pair)
+  const primarySymbol = pair.primarySymbol
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -417,7 +418,7 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
       >
         <ModalHeader
           pair={pair}
-          primaryPair={currentPrimaryPair}
+          primaryPair={primarySymbol}
           exchange={currentExchange}
           onClose={onClose}
         />
@@ -425,11 +426,11 @@ export function PairDetailModal({ pair, onClose }: PairDetailModalProps) {
         <div className="p-4 space-y-6">
           <KeyMetrics pair={pair} />
           {chartData && (
-            <ChartsSection chartData={chartData} pair={pair} primaryPair={currentPrimaryPair} />
+            <ChartsSection chartData={chartData} pair={pair} primaryPair={primarySymbol} />
           )}
           <ConfluenceSection pair={pair} />
           <NotesSection notes={pair.notes} />
-          <BacktestPanel symbol={pair.symbol} />
+          <BacktestPanel symbol={pair.symbol} primarySymbol={primarySymbol} />
           <DetailedMetrics pair={pair} />
         </div>
       </div>

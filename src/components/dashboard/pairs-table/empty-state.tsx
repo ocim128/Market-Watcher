@@ -2,15 +2,17 @@
 
 import { BarChart } from 'lucide-react'
 import { config } from '@/config'
+import type { ScanMode } from '@/config'
 
 interface EmptyStateProps {
   currentPrimaryPair: string
+  currentScanMode: ScanMode
 }
 
 /**
  * Empty state when no scan has been run yet
  */
-export function EmptyState({ currentPrimaryPair }: EmptyStateProps) {
+export function EmptyState({ currentPrimaryPair, currentScanMode }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="rounded-full bg-primary/10 p-4 mb-4 ring-1 ring-primary/20">
@@ -18,9 +20,18 @@ export function EmptyState({ currentPrimaryPair }: EmptyStateProps) {
       </div>
       <h3 className="font-semibold text-lg mb-2">Ready to Scan</h3>
       <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-6">
-        Click &quot;Scan Pairs&quot; to analyze correlations between{' '}
-        <span className="text-foreground font-mono">{currentPrimaryPair}</span> and the top{' '}
-        {config.topPairsLimit} USDT pairs.
+        {currentScanMode === 'all_vs_all' ? (
+          <>
+            Click &quot;Scan Pairs&quot; to analyze correlations across all scanned pairs in the
+            universe.
+          </>
+        ) : (
+          <>
+            Click &quot;Scan Pairs&quot; to analyze correlations between{' '}
+            <span className="text-foreground font-mono">{currentPrimaryPair}</span> and the top{' '}
+            {config.topPairsLimit} USDT pairs.
+          </>
+        )}
       </p>
     </div>
   )

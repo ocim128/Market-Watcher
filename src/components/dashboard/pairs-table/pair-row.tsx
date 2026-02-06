@@ -26,7 +26,6 @@ import {
 interface PairRowProps {
   pair: PairAnalysisResult
   currentExchange: ExchangeType
-  currentPrimaryPair: string
   primaryPrices: number[]
   pairPrices: number[]
   onSelect: () => void
@@ -215,7 +214,6 @@ function ActionsCell({
 export function PairRow({
   pair,
   currentExchange,
-  currentPrimaryPair,
   primaryPrices,
   pairPrices,
   onSelect,
@@ -234,7 +232,7 @@ export function PairRow({
       className="border-b transition-colors hover:bg-muted/40 cursor-pointer border-border/50 group relative"
       onClick={onSelect}
     >
-      <PairSymbol symbol={pair.symbol} primarySymbol={currentPrimaryPair} />
+      <PairSymbol symbol={pair.symbol} primarySymbol={pair.primarySymbol} />
       <CorrelationCell correlation={pair.correlation} />
       <TrendCell spread={recentSpread} color={sparklineColor} />
       <ZScoreCell zScore={pair.spreadZScore} />

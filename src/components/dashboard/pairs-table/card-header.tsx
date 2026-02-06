@@ -3,11 +3,13 @@
 import { Loader2 } from 'lucide-react'
 import { CardHeader as UICardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import type { ScanProgress } from '@/types'
+import type { ScanMode } from '@/config'
 import type { PairsTableStats } from './use-pairs-table-stats'
 import { formatLastScanTime } from './utils'
 
 interface PairsTableCardHeaderProps {
   currentPrimaryPair: string
+  currentScanMode: ScanMode
   isScanning: boolean
   isAnalyzing: boolean
   isComplete: boolean
@@ -16,11 +18,19 @@ interface PairsTableCardHeaderProps {
   stats: PairsTableStats
 }
 
+function buildSummaryLabel(currentPrimaryPair: string, currentScanMode: ScanMode): string {
+  if (currentScanMode === 'all_vs_all') {
+    return 'All-vs-All Pair Analysis'
+  }
+  return `${currentPrimaryPair} vs Top Pairs`
+}
+
 /**
  * Header section of the pairs table card
  */
 export function PairsTableCardHeader({
   currentPrimaryPair,
+  currentScanMode,
   isScanning,
   isAnalyzing,
   isComplete,
@@ -39,11 +49,12 @@ export function PairsTableCardHeader({
             )}
           </CardTitle>
           <CardDescription>
-            {currentPrimaryPair} vs Top USDT Pairs • Last scan: {formatLastScanTime(lastScanTime)}
+            {buildSummaryLabel(currentPrimaryPair, currentScanMode)} - Last scan:{' '}
+            {formatLastScanTime(lastScanTime)}
             {isComplete && stats.total > 0 && (
               <span>
                 {' '}
-                • Showing {stats.filtered} of {stats.total} pairs
+                - Showing {stats.filtered} of {stats.total} pairs
                 {stats.premium > 0 && (
                   <span className="text-emerald-400 ml-1 font-medium">
                     ({stats.premium} premium)
@@ -55,7 +66,6 @@ export function PairsTableCardHeader({
         </div>
       </div>
 
-      {/* Progress bar during scanning */}
       {isScanning && progress.total > 0 && (
         <div className="mt-4">
           <div className="flex justify-between text-sm text-muted-foreground mb-1">
@@ -76,7 +86,6 @@ export function PairsTableCardHeader({
         </div>
       )}
 
-      {/* Analysis indicator */}
       {isAnalyzing && (
         <div className="mt-4 text-sm text-muted-foreground flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin text-purple-500" />

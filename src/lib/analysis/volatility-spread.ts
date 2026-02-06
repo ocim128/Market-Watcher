@@ -17,7 +17,8 @@ const EPSILON = 1e-12
 export function calculateVolatilityAdjustedSpread(
   primary: number[],
   secondary: number[],
-  lookbackPeriod: number = 20
+  lookbackPeriod: number = 20,
+  spreadSeries?: number[]
 ): VolatilityAdjustedSpreadResult {
   const count = Math.min(primary.length, secondary.length)
 
@@ -49,7 +50,8 @@ export function calculateVolatilityAdjustedSpread(
   const combinedVolatility = Math.sqrt((volPrimary * volPrimary + volSecondary * volSecondary) / 2)
 
   // Calculate spread
-  const spread = calculateSpread(primary, secondary)
+  const spread =
+    spreadSeries && spreadSeries.length > 0 ? spreadSeries : calculateSpread(primary, secondary)
   const currentSpread = spread[spread.length - 1]
   const spreadMean = mean(spread)
   const spreadStd = standardDeviation(spread, spreadMean)

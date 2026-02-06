@@ -53,13 +53,20 @@ function getRegimeLabel(regime: CorrelationRegime) {
 
 function useHasActiveFilters(filters: FilterOptions): boolean {
   return useMemo(() => {
+    const sameSignalQualities =
+      filters.signalQualities.length === DEFAULT_FILTER_OPTIONS.signalQualities.length &&
+      filters.signalQualities.every(q => DEFAULT_FILTER_OPTIONS.signalQualities.includes(q))
+    const sameRegimes =
+      filters.regimes.length === DEFAULT_FILTER_OPTIONS.regimes.length &&
+      filters.regimes.every(r => DEFAULT_FILTER_OPTIONS.regimes.includes(r))
+
     return (
-      filters.minCorrelation > 0 ||
-      filters.minZScore > 0 ||
-      filters.minOpportunity > 0 ||
-      filters.minConfluence > 0 ||
-      filters.signalQualities.length < SIGNAL_QUALITIES.length ||
-      filters.regimes.length < REGIMES.length
+      filters.minCorrelation !== DEFAULT_FILTER_OPTIONS.minCorrelation ||
+      filters.minZScore !== DEFAULT_FILTER_OPTIONS.minZScore ||
+      filters.minOpportunity !== DEFAULT_FILTER_OPTIONS.minOpportunity ||
+      filters.minConfluence !== DEFAULT_FILTER_OPTIONS.minConfluence ||
+      !sameSignalQualities ||
+      !sameRegimes
     )
   }, [filters])
 }

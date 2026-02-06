@@ -23,6 +23,7 @@ import { getTradFiPairs } from '@/lib/tradfi'
 import {
   config,
   AVAILABLE_EXCHANGES,
+  AVAILABLE_SCAN_MODES,
   AVAILABLE_INTERVALS,
   PRESET_BARS,
   AVAILABLE_PRIMARY_PAIRS,
@@ -31,6 +32,7 @@ import {
   getIntervalUseCase,
   type ExchangeType,
   type IntervalType,
+  type ScanMode,
 } from '@/config'
 
 interface SettingsPanelProps {
@@ -38,12 +40,14 @@ interface SettingsPanelProps {
   onClose: () => void
   scanSettings: {
     exchange: ExchangeType
+    scanMode: ScanMode
     interval: IntervalType
     totalBars: number
     primaryPair: string
   }
   onScanSettingsChange: (settings: {
     exchange: ExchangeType
+    scanMode: ScanMode
     interval: IntervalType
     totalBars: number
     primaryPair: string
@@ -66,6 +70,10 @@ function useSettingsPanelState(
   } = useNotifications()
 
   const [customBars, setCustomBars] = useState<string>(scanSettings.totalBars.toString())
+
+  useEffect(() => {
+    setCustomBars(scanSettings.totalBars.toString())
+  }, [scanSettings.totalBars])
 
   const timeDescription = getTimeDescription(scanSettings.interval, scanSettings.totalBars)
   const useCaseDescription = getIntervalUseCase(scanSettings.interval)
@@ -158,6 +166,11 @@ interface ExchangeSelectorProps {
   onChange: (value: ExchangeType) => void
 }
 
+interface ScanModeSelectorProps {
+  value: ScanMode
+  onChange: (value: ScanMode) => void
+}
+
 function ExchangeSelector({ value, onChange }: ExchangeSelectorProps) {
   return (
     <div className="space-y-1">
@@ -176,6 +189,31 @@ function ExchangeSelector({ value, onChange }: ExchangeSelectorProps) {
             className={`text-xs ${value === exchange.value ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
           >
             {exchange.description}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ScanModeSelector({ value, onChange }: ScanModeSelectorProps) {
+  return (
+    <div className="space-y-1">
+      {AVAILABLE_SCAN_MODES.map(mode => (
+        <button
+          key={mode.value}
+          onClick={() => onChange(mode.value)}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm transition-colors ${
+            value === mode.value
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary/50 hover:bg-secondary'
+          }`}
+        >
+          <span className="font-medium">{mode.label}</span>
+          <span
+            className={`text-xs ${value === mode.value ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+          >
+            {mode.description}
           </span>
         </button>
       ))}
@@ -366,20 +404,30 @@ function ScanSettingsSection({
       </div>
 
       <div>
-        <label className="text-xs text-muted-foreground block mb-2">
-          <GitCompare className="h-3 w-3 inline mr-1" />
-          Primary Pair (Reference)
-        </label>
-        <PrimaryPairSelector
-          value={scanSettings.primaryPair}
-          options={pairOptions}
-          isLoading={isPairLoading}
-          onChange={value => onScanSettingsChange({ ...scanSettings, primaryPair: value })}
+        <label className="text-xs text-muted-foreground block mb-2">Scan Mode</label>
+        <ScanModeSelector
+          value={scanSettings.scanMode}
+          onChange={value => onScanSettingsChange({ ...scanSettings, scanMode: value })}
         />
-        <p className="text-xs text-muted-foreground mt-2">
-          All pairs will be analyzed against the selected primary pair
-        </p>
       </div>
+
+      {scanSettings.scanMode === 'primary_vs_all' && (
+        <div>
+          <label className="text-xs text-muted-foreground block mb-2">
+            <GitCompare className="h-3 w-3 inline mr-1" />
+            Primary Pair (Reference)
+          </label>
+          <PrimaryPairSelector
+            value={scanSettings.primaryPair}
+            options={pairOptions}
+            isLoading={isPairLoading}
+            onChange={value => onScanSettingsChange({ ...scanSettings, primaryPair: value })}
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            All pairs will be analyzed against the selected primary pair
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="text-xs text-muted-foreground block mb-2">Timeframe</label>
@@ -536,8 +584,12 @@ function CurrentConfig({ scanSettings }: { scanSettings: SettingsPanelProps['sca
       <div className="grid grid-cols-2 gap-1">
         <span>Pair Source:</span>
         <span className="font-mono">{scanSettings.exchange}</span>
+        <span>Scan Mode:</span>
+        <span className="font-mono">{scanSettings.scanMode}</span>
         <span>Primary Pair:</span>
-        <span className="font-mono text-primary">{scanSettings.primaryPair}</span>
+        <span className="font-mono text-primary">
+          {scanSettings.scanMode === 'all_vs_all' ? 'N/A (all pairs)' : scanSettings.primaryPair}
+        </span>
         <span>Scan Universe:</span>
         <span className="font-mono">
           {scanSettings.exchange === 'tradfi' ? 'All TradFi pairs' : `Top ${config.topPairsLimit}`}
@@ -581,7 +633,7 @@ export function SettingsPanel({
     }
 
     const exists = pairOptions.some(pair => pair.value === scanSettings.primaryPair)
-    if (!exists) {
+    if (!exists && scanSettings.scanMode === 'primary_vs_all') {
       onScanSettingsChange({ ...scanSettings, primaryPair: pairOptions[0].value })
     }
   }, [pairOptions, scanSettings, onScanSettingsChange])

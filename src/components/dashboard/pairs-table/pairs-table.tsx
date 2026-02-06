@@ -35,6 +35,7 @@ export function PairsTable() {
     progress,
     lastScanTime,
     currentPrimaryPair,
+    currentScanMode,
     currentExchange,
   } = useScan()
 
@@ -56,14 +57,12 @@ export function PairsTable() {
 
   const stats = usePairsTableStats(analysisResults, filteredData)
 
-  // Get primary pair prices for sparkline calculations
-  const primaryPrices = priceMap.get(currentPrimaryPair) || []
-
   return (
     <>
       <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
         <PairsTableCardHeader
           currentPrimaryPair={currentPrimaryPair}
+          currentScanMode={currentScanMode}
           isScanning={isScanning}
           isAnalyzing={isAnalyzing}
           isComplete={isComplete}
@@ -93,11 +92,10 @@ export function PairsTable() {
                   <AnimatePresence mode="popLayout">
                     {sortedData.map(pair => (
                       <PairRow
-                        key={pair.symbol}
+                        key={pair.pairKey}
                         pair={pair}
                         currentExchange={currentExchange}
-                        currentPrimaryPair={currentPrimaryPair}
-                        primaryPrices={primaryPrices}
+                        primaryPrices={priceMap.get(pair.primarySymbol) || []}
                         pairPrices={priceMap.get(pair.symbol) || []}
                         onSelect={() => setSelectedPair(pair)}
                       />
@@ -109,7 +107,7 @@ export function PairsTable() {
           ) : analysisResults.length > 0 ? (
             <NoResultsState onClearFilters={resetFilters} />
           ) : (
-            <EmptyState currentPrimaryPair={currentPrimaryPair} />
+            <EmptyState currentPrimaryPair={currentPrimaryPair} currentScanMode={currentScanMode} />
           )}
         </CardContent>
       </Card>

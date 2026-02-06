@@ -30,6 +30,12 @@ function formatPercent(value: number, decimals: number = 2): string {
   return `${sign}${value.toFixed(decimals)}%`
 }
 
+function parseInputNumber(raw: string): number {
+  const normalized = raw.replace(',', '.')
+  const value = Number.parseFloat(normalized)
+  return Number.isFinite(value) ? value : 0
+}
+
 interface CombinedStats {
   totalPairs: number
   profitablePairs: number
@@ -123,7 +129,7 @@ function ConfigInput({
           min={min}
           max={max}
           value={value}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
+          onChange={e => onChange(parseInputNumber(e.target.value))}
           className={`w-full px-3 py-2 rounded-lg bg-background/50 border border-white/10 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all font-mono ${colorClass}`}
         />
       </div>
@@ -143,7 +149,7 @@ function BacktestConfig({
       <ConfigInput
         label="Entry Z-Score"
         value={config.entrySpreadThreshold}
-        step="0.5"
+        step="0.1"
         min={1}
         max={5}
         onChange={v => onChange({ entrySpreadThreshold: Math.abs(v) || 3 })}
@@ -322,12 +328,10 @@ function TableHeader() {
 function TableRow({
   result,
   index,
-  primaryPair,
   onClick,
 }: {
   result: BacktestResult
   index: number
-  primaryPair: string
   onClick?: () => void
 }) {
   const equityColor = result.equityCurve[result.equityCurve.length - 1] >= 0 ? '#34d399' : '#fb7185'
@@ -342,7 +346,7 @@ function TableRow({
       <td className="py-2.5 px-4 font-medium relative">
         <span className="text-foreground">{result.symbol.replace('USDT', '')}</span>
         <span className="text-[10px] text-muted-foreground ml-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
-          vs {primaryPair.replace('USDT', '')}
+          vs {result.primarySymbol.replace('USDT', '')}
         </span>
       </td>
       <td className="py-2.5 px-4 text-right font-mono text-muted-foreground">
@@ -383,11 +387,9 @@ function TableRow({
 
 function ResultsTable({
   results,
-  primaryPair,
   onPairClick,
 }: {
   results: BacktestResult[]
-  primaryPair: string
   onPairClick?: (symbol: string) => void
 }) {
   const sortedResults = useMemo(
@@ -406,10 +408,9 @@ function ResultsTable({
           <tbody className="divide-y divide-white/5">
             {sortedResults.map((result, idx) => (
               <TableRow
-                key={result.symbol}
+                key={`${result.primarySymbol}|${result.symbol}`}
                 result={result}
                 index={idx}
-                primaryPair={primaryPair}
                 onClick={() => onPairClick?.(result.symbol)}
               />
             ))}
@@ -522,32 +523,28 @@ function PanelHeader({
 }
 
 function useBacktestAllState(onPairClick?: (symbol: string) => void) {
-  const { results, analysisResults, currentPrimaryPair } = useScan()
+  const { results, analysisResults } = useScan()
   const [btConfig, setBtConfig] = useState<BacktestConfig>(DEFAULT_BACKTEST_CONFIG)
   const [backtestResults, setBacktestResults] = useState<BacktestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
 
-  const primaryCloses = useMemo(() => {
-    const primary = results.find(r => r.symbol === currentPrimaryPair)
-    return primary?.closePrices || []
-  }, [results, currentPrimaryPair])
+  const priceBySymbol = useMemo(() => {
+    const map = new Map<string, number[]>()
+    for (const item of results) {
+      map.set(item.symbol, item.closePrices)
+    }
+    return map
+  }, [results])
 
   const eligiblePairs = useMemo(
-    () =>
-      analysisResults.filter(
-        r => r.symbol !== currentPrimaryPair && r.correlation >= btConfig.minCorrelation
-      ),
-    [analysisResults, btConfig.minCorrelation, currentPrimaryPair]
+    () => analysisResults.filter(r => Math.abs(r.correlation) >= btConfig.minCorrelation),
+    [analysisResults, btConfig.minCorrelation]
   )
 
   const combinedStats = useMemo(() => calculateCombinedStats(backtestResults), [backtestResults])
 
   const handleRunAll = useCallback(async () => {
-    if (primaryCloses.length === 0) {
-      return
-    }
-
     setIsRunning(true)
     setBacktestResults([])
     setProgress({ current: 0, total: eligiblePairs.length })
@@ -556,14 +553,15 @@ function useBacktestAllState(onPairClick?: (symbol: string) => void) {
 
     for (let i = 0; i < eligiblePairs.length; i++) {
       const pair = eligiblePairs[i]
-      const pairData = results.find(r => r.symbol === pair.symbol)
+      const primaryCloses = priceBySymbol.get(pair.primarySymbol)
+      const secondaryCloses = priceBySymbol.get(pair.symbol)
 
-      if (pairData) {
+      if (primaryCloses && secondaryCloses) {
         const result = runBacktest(
           primaryCloses,
-          pairData.closePrices,
+          secondaryCloses,
           pair.symbol,
-          currentPrimaryPair,
+          pair.primarySymbol,
           btConfig
         )
         allResults.push(result)
@@ -577,7 +575,7 @@ function useBacktestAllState(onPairClick?: (symbol: string) => void) {
 
     setBacktestResults(allResults)
     setIsRunning(false)
-  }, [primaryCloses, eligiblePairs, results, btConfig, currentPrimaryPair])
+  }, [eligiblePairs, priceBySymbol, btConfig])
 
   const handleReset = () => {
     setBacktestResults([])
@@ -597,7 +595,6 @@ function useBacktestAllState(onPairClick?: (symbol: string) => void) {
     eligiblePairs,
     analysisResults,
     combinedStats,
-    currentPrimaryPair,
     handleRunAll,
     handleReset,
     onPairClick,
@@ -614,7 +611,6 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
     eligiblePairs,
     analysisResults,
     combinedStats,
-    currentPrimaryPair,
     handleRunAll,
     handleReset,
   } = useBacktestAllState(onPairClick)
@@ -646,11 +642,7 @@ export function BacktestAllPanel({ onPairClick }: BacktestAllPanelProps) {
             >
               <CombinedSummary stats={combinedStats} />
               <AdditionalStats stats={combinedStats} />
-              <ResultsTable
-                results={backtestResults}
-                primaryPair={currentPrimaryPair}
-                onPairClick={onPairClick}
-              />
+              <ResultsTable results={backtestResults} onPairClick={onPairClick} />
             </motion.div>
           )}
         </AnimatePresence>

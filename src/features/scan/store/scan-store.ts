@@ -7,7 +7,7 @@
 
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { config, type ExchangeType } from '@/config'
+import { config, type ExchangeType, type ScanMode } from '@/config'
 import type { ScanProgress, BinanceKline, PairAnalysisResult } from '@/types'
 
 export interface ScanResult {
@@ -21,6 +21,7 @@ export interface ScanOptions {
   interval?: string
   totalBars?: number
   primaryPair?: string
+  scanMode?: ScanMode
   exchange?: ExchangeType
   concurrency?: number
   includePrimary?: boolean
@@ -33,6 +34,7 @@ interface ScanState {
   results: ScanResult[]
   analysisResults: PairAnalysisResult[]
   currentPrimaryPair: string
+  currentScanMode: ScanMode
   currentExchange: ExchangeType
   lastScanTime: Date | null
 
@@ -51,6 +53,7 @@ interface ScanActions {
   setResults: (results: ScanResult[]) => void
   setAnalysisResults: (results: PairAnalysisResult[]) => void
   setCurrentPrimaryPair: (pair: string) => void
+  setCurrentScanMode: (mode: ScanMode) => void
   setCurrentExchange: (exchange: ExchangeType) => void
   setIsAnalyzing: (isAnalyzing: boolean) => void
   setLastScanTime: (time: Date | null) => void
@@ -81,6 +84,7 @@ const initialState: Omit<ScanState, keyof ScanActions> = {
   results: [],
   analysisResults: [],
   currentPrimaryPair: config.primaryPair,
+  currentScanMode: config.scanMode,
   currentExchange: config.exchange,
   lastScanTime: null,
   isAnalyzing: false,
@@ -108,6 +112,8 @@ export const useScanStore = create<ScanState & ScanActions>()(
       setAnalysisResults: analysisResults => set({ analysisResults }),
 
       setCurrentPrimaryPair: currentPrimaryPair => set({ currentPrimaryPair }),
+
+      setCurrentScanMode: currentScanMode => set({ currentScanMode }),
 
       setCurrentExchange: currentExchange => set({ currentExchange }),
 
@@ -173,6 +179,7 @@ export const selectScanProgress = (state: ScanState & ScanActions) => state.prog
 export const selectScanResults = (state: ScanState & ScanActions) => state.results
 export const selectAnalysisResults = (state: ScanState & ScanActions) => state.analysisResults
 export const selectCurrentPrimaryPair = (state: ScanState & ScanActions) => state.currentPrimaryPair
+export const selectCurrentScanMode = (state: ScanState & ScanActions) => state.currentScanMode
 export const selectCurrentExchange = (state: ScanState & ScanActions) => state.currentExchange
 export const selectIsScanning = (state: ScanState & ScanActions) => state.isScanning
 export const selectIsAnalyzing = (state: ScanState & ScanActions) => state.isAnalyzing

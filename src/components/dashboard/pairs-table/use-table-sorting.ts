@@ -44,8 +44,8 @@ export function useTableSorting(filteredData: PairAnalysisResult[]): UseTableSor
 
       switch (sortConfig.key) {
         case 'symbol':
-          aVal = a.symbol
-          bVal = b.symbol
+          aVal = `${a.primarySymbol}:${a.symbol}`
+          bVal = `${b.primarySymbol}:${b.symbol}`
           break
         case 'correlation':
           aVal = Math.abs(a.correlation)

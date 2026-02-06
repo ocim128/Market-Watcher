@@ -4,6 +4,7 @@
  */
 
 import { useState, useMemo } from 'react'
+import { useEffect, useRef } from 'react'
 import { DEFAULT_FILTER_OPTIONS } from '@/types'
 import type { PairAnalysisResult, FilterOptions } from '@/types'
 
@@ -20,8 +21,28 @@ export interface UseTableFiltersResult {
  * Hook for filtering pair analysis data
  */
 export function useTableFilters(analysisResults: PairAnalysisResult[]): UseTableFiltersResult {
-  const [filters, setFilters] = useState<FilterOptions>(DEFAULT_FILTER_OPTIONS)
+  const [filters, setFilters] = useState<FilterOptions>(() => ({ ...DEFAULT_FILTER_OPTIONS }))
   const [searchQuery, setSearchQuery] = useState('')
+  const hasMigratedLegacyDefaultsRef = useRef(false)
+
+  useEffect(() => {
+    if (hasMigratedLegacyDefaultsRef.current) {
+      return
+    }
+    hasMigratedLegacyDefaultsRef.current = true
+
+    const hasLegacyZeroThresholds =
+      filters.minCorrelation === 0 &&
+      filters.minZScore === 0 &&
+      filters.minOpportunity === 0 &&
+      filters.minConfluence === 0
+    const hasLegacyAllQualities = filters.signalQualities.length >= 5
+    const hasLegacyAllRegimes = filters.regimes.length >= 7
+
+    if (hasLegacyZeroThresholds && hasLegacyAllQualities && hasLegacyAllRegimes) {
+      setFilters({ ...DEFAULT_FILTER_OPTIONS })
+    }
+  }, [filters])
 
   const filteredData = useMemo(() => {
     if (!analysisResults) {
@@ -32,7 +53,9 @@ export function useTableFilters(analysisResults: PairAnalysisResult[]): UseTable
       // Search filter
       if (searchQuery) {
         const search = searchQuery.toLowerCase()
-        if (!pair.symbol.toLowerCase().includes(search)) {
+        const symbolMatch = pair.symbol.toLowerCase().includes(search)
+        const primaryMatch = pair.primarySymbol.toLowerCase().includes(search)
+        if (!symbolMatch && !primaryMatch) {
           return false
         }
       }
@@ -72,7 +95,7 @@ export function useTableFilters(analysisResults: PairAnalysisResult[]): UseTable
   }, [analysisResults, filters, searchQuery])
 
   const resetFilters = () => {
-    setFilters(DEFAULT_FILTER_OPTIONS)
+    setFilters({ ...DEFAULT_FILTER_OPTIONS })
     setSearchQuery('')
   }
 
