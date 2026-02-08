@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Target, ArrowRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -13,6 +14,8 @@ import { TimeframeBadge } from './timeframe-badge'
 interface ConfluenceCardProps {
   result: ConfluenceResult
   index: number
+  onMockTrade?: (result: ConfluenceResult) => void
+  isSavingMockTrade?: boolean
 }
 
 function useDataQualityCheck(result: ConfluenceResult) {
@@ -43,9 +46,13 @@ function DataQualityBanner() {
 interface CardHeaderProps {
   result: ConfluenceResult
   onClick: () => void
+  onMockTrade?: (result: ConfluenceResult) => void
+  isSavingMockTrade?: boolean
 }
 
-function CardHeaderContent({ result, onClick }: CardHeaderProps) {
+function CardHeaderContent({ result, onClick, onMockTrade, isSavingMockTrade }: CardHeaderProps) {
+  const canMockTrade = result.signalDirection !== 'neutral'
+
   return (
     <CardHeader className="pb-3" onClick={onClick}>
       <div className="flex items-center justify-between">
@@ -78,6 +85,20 @@ function CardHeaderContent({ result, onClick }: CardHeaderProps) {
               Confluence
             </div>
           </div>
+          {canMockTrade && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={isSavingMockTrade}
+              onClick={event => {
+                event.stopPropagation()
+                onMockTrade?.(result)
+              }}
+            >
+              {isSavingMockTrade ? 'Saving...' : 'Mock Trade'}
+            </Button>
+          )}
         </div>
       </div>
     </CardHeader>
@@ -106,6 +127,8 @@ function SignalDirection({ result }: { result: ConfluenceResult }) {
   }
 
   const isLong = result.signalDirection === 'long_spread'
+  const longSymbol = (isLong ? result.primarySymbol : result.symbol).replace('USDT', '')
+  const shortSymbol = (isLong ? result.symbol : result.primarySymbol).replace('USDT', '')
 
   return (
     <div className="flex items-center gap-2 mb-3 p-2 bg-primary/5 rounded-lg border border-primary/10">
@@ -118,7 +141,7 @@ function SignalDirection({ result }: { result: ConfluenceResult }) {
       </span>
       <ArrowRight className="h-3 w-3 text-muted-foreground mx-1" />
       <span className="text-xs text-muted-foreground">
-        {isLong ? 'Buy Primary / Sell Secondary' : 'Sell Primary / Buy Secondary'}
+        LONG {longSymbol} / SHORT {shortSymbol}
       </span>
     </div>
   )
@@ -183,7 +206,12 @@ function ExpandHint({ expanded }: { expanded: boolean }) {
   )
 }
 
-export function ConfluenceCard({ result, index }: ConfluenceCardProps) {
+export function ConfluenceCard({
+  result,
+  index,
+  onMockTrade,
+  isSavingMockTrade,
+}: ConfluenceCardProps) {
   const [expanded, setExpanded] = useState(false)
   const hasDataQualityIssue = useDataQualityCheck(result)
 
@@ -195,7 +223,12 @@ export function ConfluenceCard({ result, index }: ConfluenceCardProps) {
     >
       <Card className={getCardClasses(result.confidence, hasDataQualityIssue)}>
         {hasDataQualityIssue && <DataQualityBanner />}
-        <CardHeaderContent result={result} onClick={() => setExpanded(!expanded)} />
+        <CardHeaderContent
+          result={result}
+          onClick={() => setExpanded(!expanded)}
+          onMockTrade={onMockTrade}
+          isSavingMockTrade={isSavingMockTrade}
+        />
 
         <CardContent className="pt-0">
           <TimeframeScores result={result} />

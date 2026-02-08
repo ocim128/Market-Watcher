@@ -158,7 +158,9 @@ export function buildConfluenceNotes(
   direction: string,
   zScoreAgreement: number,
   qualityAgreement: number,
-  allScoresIdentical?: boolean
+  allScoresIdentical?: boolean,
+  primarySymbol?: string,
+  symbol?: string
 ): string[] {
   const notes: string[] = []
 
@@ -174,10 +176,12 @@ export function buildConfluenceNotes(
   )
 
   if (direction !== 'neutral') {
+    const primaryLabel = (primarySymbol ?? 'primary').replace('USDT', '')
+    const secondaryLabel = (symbol ?? 'secondary').replace('USDT', '')
     const action =
       direction === 'long_spread'
-        ? 'LONG spread (buy primary, sell secondary)'
-        : 'SHORT spread (sell primary, buy secondary)'
+        ? `LONG spread (LONG ${primaryLabel}, SHORT ${secondaryLabel})`
+        : `SHORT spread (SHORT ${primaryLabel}, LONG ${secondaryLabel})`
     notes.push(`📊 Suggested: ${action}`)
   }
 

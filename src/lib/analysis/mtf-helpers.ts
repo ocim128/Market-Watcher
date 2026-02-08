@@ -1,10 +1,13 @@
 import { type QueryClient } from '@tanstack/react-query'
-import { config } from '@/config'
+import { config, type ScanMode } from '@/config'
 import { fetchKlinesSmart, extractClosePrices, getTopUsdtPairs } from '@/lib/binance'
 import {
   analyzeMultiTimeframeConfluence,
   type ConfluenceResult,
 } from '@/lib/analysis/multi-timeframe'
+import { buildAllVsAllCandidates } from '@/lib/analysis/all-vs-all-candidates'
+import { createReversionScorer, type ReversionScorer } from '@/lib/analysis/reversion-scoring'
+import { loadHistory } from '@/lib/history/tracking'
 import { resolveFetchInterval } from '@/lib/binance/resample'
 import { queryKeys } from '@/hooks/use-binance-data'
 import type { BinanceKline } from '@/types'
@@ -34,8 +37,8 @@ export function clearCustomIntervalCache(queryClient: QueryClient): void {
   const allCacheKeys = queryClient.getQueryCache().getAll()
   allCacheKeys.forEach(query => {
     const key = query.queryKey
-    if (Array.isArray(key) && key[0] === 'klines') {
-      const interval = key[2] as string
+    if (Array.isArray(key) && key[1] === 'klines') {
+      const interval = key[3] as string
       if (interval && !NATIVE_INTERVALS.includes(interval)) {
         queryClient.removeQueries({ queryKey: key })
       }
@@ -127,7 +130,9 @@ export function analyzeConfluenceForPairs(
   pairs: string[],
   symbolIntervalData: Map<string, Map<string, number[]>>,
   primaryPair: string,
-  intervals: string[]
+  intervals: string[],
+  scanMode: ScanMode,
+  reversionScorersByInterval: Map<string, ReversionScorer>
 ): ConfluenceResult[] {
   const primaryIntervalData = symbolIntervalData.get(primaryPair)
   if (!primaryIntervalData) {
@@ -156,9 +161,65 @@ export function analyzeConfluenceForPairs(
     if (timeframeData.size > 0) {
       const confluence = analyzeMultiTimeframeConfluence(timeframeData, symbol, primaryPair, {
         intervals,
+        scanMode,
+        reversionScorersByInterval,
       })
       confluenceResults.push(confluence)
     }
+  }
+
+  confluenceResults.sort((a, b) => b.confluenceScore - a.confluenceScore)
+  return confluenceResults
+}
+
+function analyzeConfluenceForAllVsAll(
+  symbolIntervalData: Map<string, Map<string, number[]>>,
+  intervals: string[],
+  reversionScorersByInterval: Map<string, ReversionScorer>
+): ConfluenceResult[] {
+  const anchorInterval = intervals[0]
+  const series = Array.from(symbolIntervalData.entries())
+    .map(([symbol, intervalData]) => ({
+      symbol,
+      closePrices: intervalData.get(anchorInterval) ?? [],
+    }))
+    .filter(item => item.closePrices.length > 1)
+
+  const candidates = buildAllVsAllCandidates(series)
+  const confluenceResults: ConfluenceResult[] = []
+
+  for (const candidate of candidates) {
+    const firstIntervalData = symbolIntervalData.get(candidate.first.symbol)
+    const secondIntervalData = symbolIntervalData.get(candidate.second.symbol)
+    if (!firstIntervalData || !secondIntervalData) {
+      continue
+    }
+
+    const timeframeData = new Map<string, { primary: number[]; secondary: number[] }>()
+    for (const interval of intervals) {
+      const firstPrices = firstIntervalData.get(interval)
+      const secondPrices = secondIntervalData.get(interval)
+      if (firstPrices?.length && secondPrices?.length) {
+        timeframeData.set(interval, { primary: firstPrices, secondary: secondPrices })
+      }
+    }
+
+    if (timeframeData.size === 0) {
+      continue
+    }
+
+    confluenceResults.push(
+      analyzeMultiTimeframeConfluence(
+        timeframeData,
+        candidate.second.symbol,
+        candidate.first.symbol,
+        {
+          intervals,
+          scanMode: 'all_vs_all',
+          reversionScorersByInterval,
+        }
+      )
+    )
   }
 
   confluenceResults.sort((a, b) => b.confluenceScore - a.confluenceScore)
@@ -220,19 +281,20 @@ export async function performMtfScan(
     intervals: string[]
     totalBars: number
     primaryPair: string
+    scanMode: ScanMode
     concurrency: number
   },
   queryClient: QueryClient,
-  onProgressUpdate: (completedCount: number, currentSymbol: string) => void
+  onProgressUpdate: (completedCount: number, currentSymbol: string, totalSymbols: number) => void
 ): Promise<ConfluenceResult[]> {
-  const { limit, intervals, totalBars, primaryPair, concurrency } = options
+  const { limit, intervals, totalBars, primaryPair, scanMode, concurrency } = options
 
   clearCustomIntervalCache(queryClient)
 
   // Fetch pairs
-  let pairs = await getTopUsdtPairs(limit)
-  pairs = pairs.filter(p => p !== primaryPair)
-  const allSymbols = [primaryPair, ...pairs]
+  const allPairs = await getTopUsdtPairs(limit)
+  const pairs = allPairs.filter(p => p !== primaryPair)
+  const allSymbols = scanMode === 'all_vs_all' ? allPairs : [primaryPair, ...pairs]
 
   const symbolIntervalData = new Map<string, Map<string, number[]>>()
   let totalCompleted = 0
@@ -249,7 +311,7 @@ export async function performMtfScan(
       symbolIntervalData,
       (batchCompleted, currentSymbol) => {
         totalCompleted += batchCompleted
-        onProgressUpdate(totalCompleted, currentSymbol)
+        onProgressUpdate(totalCompleted, currentSymbol, allSymbols.length)
       }
     )
 
@@ -262,6 +324,29 @@ export async function performMtfScan(
     }
   }
 
-  // Analyze confluence
-  return analyzeConfluenceForPairs(pairs, symbolIntervalData, primaryPair, intervals)
+  const history = loadHistory()
+  const reversionScorersByInterval = new Map<string, ReversionScorer>()
+  for (const interval of intervals) {
+    reversionScorersByInterval.set(
+      interval,
+      createReversionScorer({
+        interval,
+        scanMode,
+        primaryPair,
+        history,
+      })
+    )
+  }
+
+  if (scanMode === 'all_vs_all') {
+    return analyzeConfluenceForAllVsAll(symbolIntervalData, intervals, reversionScorersByInterval)
+  }
+  return analyzeConfluenceForPairs(
+    pairs,
+    symbolIntervalData,
+    primaryPair,
+    intervals,
+    scanMode,
+    reversionScorersByInterval
+  )
 }

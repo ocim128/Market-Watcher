@@ -1,9 +1,17 @@
 'use client'
 
+import type { ScanMode } from '@/config'
 import { PANEL_PRESETS, ALL_INTERVALS, type PresetKey } from './constants'
-import { CustomIntervalSelector, AnalysisControls, PresetSelector } from './settings-controls'
+import {
+  CustomIntervalSelector,
+  AnalysisControls,
+  PresetSelector,
+  ScanModeSelector,
+} from './settings-controls'
 
 interface SettingsPanelProps {
+  scanMode: ScanMode
+  onScanModeChange: (scanMode: ScanMode) => void
   selectedPreset: PresetKey
   onPresetChange: (preset: PresetKey) => void
   customIntervals: string[]
@@ -18,6 +26,8 @@ interface SettingsPanelProps {
  * Settings panel for multi-timeframe configuration
  */
 export function SettingsPanel({
+  scanMode,
+  onScanModeChange,
   selectedPreset,
   onPresetChange,
   customIntervals,
@@ -37,6 +47,8 @@ export function SettingsPanel({
 
   return (
     <div className="space-y-4">
+      <ScanModeSelector scanMode={scanMode} onScanModeChange={onScanModeChange} />
+
       <PresetSelector selectedPreset={selectedPreset} onPresetChange={onPresetChange} />
 
       {selectedPreset === 'custom' && (
@@ -49,6 +61,7 @@ export function SettingsPanel({
       )}
 
       <AnalysisControls
+        scanMode={scanMode}
         barCount={barCount}
         onBarCountChange={onBarCountChange}
         pairLimit={pairLimit}

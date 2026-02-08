@@ -2,6 +2,7 @@ import { SlidersHorizontal, BarChart3, Coins } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { AVAILABLE_SCAN_MODES, type ScanMode } from '@/config'
 import { ALL_INTERVALS, PANEL_PRESETS, type PresetKey } from './constants'
 
 interface CustomIntervalSelectorProps {
@@ -46,15 +47,17 @@ export function CustomIntervalSelector({
 }
 
 interface AnalysisControlsProps {
+  scanMode: ScanMode
   barCount: number
   onBarCountChange: (count: number) => void
   pairLimit: number
   onPairLimitChange: (limit: number) => void
 }
 
-const PAIR_LIMIT_OPTIONS = [10, 20, 30, 50, 100]
+const PAIR_LIMIT_OPTIONS = [10, 20, 30, 50, 100, 120]
 
 export function AnalysisControls({
+  scanMode,
   barCount,
   onBarCountChange,
   pairLimit,
@@ -84,7 +87,8 @@ export function AnalysisControls({
       </div>
       <div className="space-y-2">
         <div className="text-xs font-medium flex items-center gap-2">
-          <Coins className="h-3 w-3" /> Max Pairs to Analyze
+          <Coins className="h-3 w-3" />{' '}
+          {scanMode === 'all_vs_all' ? 'Universe Size' : 'Max Pairs to Analyze'}
         </div>
         <div className="flex flex-wrap gap-1">
           {PAIR_LIMIT_OPTIONS.map(limit => (
@@ -102,6 +106,35 @@ export function AnalysisControls({
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+interface ScanModeSelectorProps {
+  scanMode: ScanMode
+  onScanModeChange: (scanMode: ScanMode) => void
+}
+
+export function ScanModeSelector({ scanMode, onScanModeChange }: ScanModeSelectorProps) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {AVAILABLE_SCAN_MODES.map(mode => (
+        <Button
+          key={mode.value}
+          variant={scanMode === mode.value ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => onScanModeChange(mode.value)}
+          className={cn(
+            'justify-start text-xs h-auto py-2',
+            scanMode === mode.value && 'border-primary'
+          )}
+        >
+          <div className="text-left">
+            <div className="font-medium">{mode.label}</div>
+            <div className="text-[10px] opacity-70">{mode.description}</div>
+          </div>
+        </Button>
+      ))}
     </div>
   )
 }

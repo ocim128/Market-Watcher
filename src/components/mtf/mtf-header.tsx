@@ -3,14 +3,22 @@ import { ArrowLeft, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { ConfluenceResult } from '@/types'
+import type { ScanMode } from '@/config'
 
 export function MtfHeader({
   currentPrimaryPair,
+  currentScanMode,
   resultsCount,
 }: {
   currentPrimaryPair: string
+  currentScanMode: ScanMode
   resultsCount: number
 }) {
+  const scanDescription =
+    currentScanMode === 'all_vs_all'
+      ? 'Analyze all-pairs correlations across multiple timeframes'
+      : `Analyze ${currentPrimaryPair.replace('USDT', '')} correlations across multiple timeframes`
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div className="flex items-center gap-3">
@@ -24,9 +32,7 @@ export function MtfHeader({
         </div>
         <div>
           <h1 className="text-2xl font-bold">Multi-Timeframe Confluence</h1>
-          <p className="text-sm text-muted-foreground">
-            Analyze {currentPrimaryPair.replace('USDT', '')} correlations across multiple timeframes
-          </p>
+          <p className="text-sm text-muted-foreground">{scanDescription}</p>
         </div>
       </div>
       {resultsCount > 0 && (

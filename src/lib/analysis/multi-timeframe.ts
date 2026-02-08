@@ -4,6 +4,8 @@
  */
 
 import { analyzePair } from './pair-analysis'
+import { createReversionScorer, type ReversionScorer } from './reversion-scoring'
+import type { ScanMode } from '@/config'
 
 import type {
   ConfluenceResult,
@@ -24,6 +26,11 @@ import {
   getSuggestedTimeframes,
 } from './multi-timeframe-utils'
 
+interface RuntimeConfluenceOptions {
+  scanMode?: ScanMode
+  reversionScorersByInterval?: Map<string, ReversionScorer>
+}
+
 export type { ConfluenceResult, TimeframeAnalysis, ConfluenceOptions }
 export { getConfluenceIntervalOptions, getSuggestedTimeframes }
 
@@ -31,7 +38,9 @@ function analyzeTimeframes(
   timeframeData: Map<string, { primary: number[]; secondary: number[] }>,
   symbol: string,
   primarySymbol: string,
-  intervals: string[]
+  intervals: string[],
+  scanMode: ScanMode,
+  reversionScorersByInterval?: Map<string, ReversionScorer>
 ): TimeframeAnalysis[] {
   const analyses: TimeframeAnalysis[] = []
 
@@ -41,10 +50,18 @@ function analyzeTimeframes(
       continue
     }
 
-    const result = analyzePair(data.primary, data.secondary, symbol, primarySymbol, {
+    const rawResult = analyzePair(data.primary, data.secondary, symbol, primarySymbol, {
       computeCorrelationVelocity: true,
       computeVolatilityAdjustedSpread: true,
     })
+    const scorer =
+      reversionScorersByInterval?.get(interval) ??
+      createReversionScorer({
+        interval,
+        scanMode,
+        primaryPair: primarySymbol,
+      })
+    const result = scorer.score(rawResult)
 
     analyses.push({ interval, result, weight: getIntervalWeight(interval) })
   }
@@ -80,10 +97,18 @@ export function analyzeMultiTimeframeConfluence(
   timeframeData: Map<string, { primary: number[]; secondary: number[] }>,
   symbol: string,
   primarySymbol: string,
-  options: ConfluenceOptions = {}
+  options: ConfluenceOptions & RuntimeConfluenceOptions = {}
 ): ConfluenceResult {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const analyses = analyzeTimeframes(timeframeData, symbol, primarySymbol, opts.intervals)
+  const scanMode = options.scanMode ?? 'primary_vs_all'
+  const analyses = analyzeTimeframes(
+    timeframeData,
+    symbol,
+    primarySymbol,
+    opts.intervals,
+    scanMode,
+    options.reversionScorersByInterval
+  )
 
   if (analyses.length === 0) {
     return createEmptyConfluenceResult(symbol, primarySymbol, opts.intervals.length)
@@ -148,7 +173,9 @@ export function analyzeMultiTimeframeConfluence(
       signalDirection,
       zScoreAgreement,
       qualityAgreement,
-      allScoresIdentical
+      allScoresIdentical,
+      primarySymbol,
+      symbol
     ),
   }
 }

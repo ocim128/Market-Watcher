@@ -9,17 +9,16 @@ import { config, type ExchangeType, type ScanMode } from '@/config'
 import { getTopUsdtPairs, fetchKlinesPaged, extractClosePrices } from '@/lib/binance'
 import { getTradFiPairs, fetchTradFiKlinesPaged } from '@/lib/tradfi'
 import { analyzePair } from '@/lib/analysis'
-import { calculateReturns, pearsonCorrelation } from '@/lib/analysis/statistics'
+import { buildAllVsAllCandidates } from '@/lib/analysis/all-vs-all-candidates'
+import {
+  applyProbabilityScoring as applySharedProbabilityScoring,
+  ALL_PAIRS_PRIMARY,
+} from '@/lib/analysis/reversion-scoring'
 import { loadHistory, saveSnapshot } from '@/lib/history/tracking'
-import { buildReversionModel } from '@/lib/history/reversion-probability'
 import { queryKeys } from '@/hooks/use-binance-data'
 import type { QueryClient } from '@tanstack/react-query'
 import type { BinanceKline, PairAnalysisResult } from '@/types'
 import type { ScanOptions, ScanResult } from '../store/scan-store'
-
-const ALL_PAIRS_PRIMARY = 'ALL_PAIRS'
-const ALL_VS_ALL_MIN_CORRELATION = 0.35
-const ALL_VS_ALL_MAX_CANDIDATES = 2500
 
 /**
  * Fetch klines for a symbol, using cache if available
@@ -58,54 +57,18 @@ async function fetchWithCache(
   }
 }
 
-function applyProbabilityScoring(
+function rescoreByProbability(
   analyzed: PairAnalysisResult[],
   interval: string,
   scanMode: ScanMode,
   primaryPair: string
 ): PairAnalysisResult[] {
-  if (analyzed.length === 0) {
-    return []
-  }
-
-  const history = loadHistory()
-  const modelPrimary = scanMode === 'all_vs_all' ? ALL_PAIRS_PRIMARY : primaryPair
-  const model = buildReversionModel(history, modelPrimary, interval)
-
-  const rescored = analyzed.map(result => {
-    const estimate = model.estimate(result)
-    const tradable = result.stationarity.isTradable
-    const probability = estimate?.probability ?? result.reversionProbability.probability
-    const lookaheadBars = estimate?.lookaheadBars ?? result.reversionProbability.lookaheadBars
-    const sampleSize = estimate?.sampleSize ?? result.reversionProbability.sampleSize
-    const wins = estimate?.wins ?? result.reversionProbability.wins
-    const method = estimate ? 'history' : result.reversionProbability.method
-
-    const opportunityScore = tradable ? Math.round(probability * 100) : 0
-    const probabilityLabel = `${Math.round(probability * 100)}% reversion in ${lookaheadBars} bars`
-    const notes = [...result.notes]
-    if (estimate) {
-      notes.push(`Historical edge: ${probabilityLabel} (${wins}/${sampleSize} labeled samples).`)
-    } else {
-      notes.push(`Estimated edge (fallback): ${probabilityLabel}.`)
-    }
-
-    return {
-      ...result,
-      opportunityScore,
-      reversionProbability: {
-        probability,
-        lookaheadBars,
-        sampleSize,
-        wins,
-        method,
-      },
-      notes,
-    }
+  return applySharedProbabilityScoring(analyzed, {
+    interval,
+    scanMode,
+    primaryPair,
+    history: loadHistory(),
   })
-
-  rescored.sort((a, b) => b.opportunityScore - a.opportunityScore)
-  return rescored
 }
 
 function analyzePrimaryVsAllScanResults(
@@ -131,39 +94,6 @@ function analyzePrimaryVsAllScanResults(
   }
 
   return analyzed
-}
-
-interface PairCandidate {
-  first: ScanResult
-  second: ScanResult
-  absCorrelation: number
-}
-
-function buildAllVsAllCandidates(scanResults: ScanResult[]): PairCandidate[] {
-  const returnsMap = new Map<string, number[]>()
-  for (const result of scanResults) {
-    returnsMap.set(result.symbol, calculateReturns(result.closePrices))
-  }
-
-  const candidates: PairCandidate[] = []
-  for (let i = 0; i < scanResults.length; i++) {
-    for (let j = i + 1; j < scanResults.length; j++) {
-      const first = scanResults[i]
-      const second = scanResults[j]
-      const firstReturns = returnsMap.get(first.symbol) ?? []
-      const secondReturns = returnsMap.get(second.symbol) ?? []
-      const quickCorr = pearsonCorrelation(firstReturns, secondReturns)
-      const absCorrelation = Math.abs(quickCorr)
-      if (absCorrelation < ALL_VS_ALL_MIN_CORRELATION) {
-        continue
-      }
-      candidates.push({ first, second, absCorrelation })
-    }
-  }
-
-  return candidates
-    .sort((a, b) => b.absCorrelation - a.absCorrelation)
-    .slice(0, ALL_VS_ALL_MAX_CANDIDATES)
 }
 
 function analyzeAllVsAllScanResults(scanResults: ScanResult[]): PairAnalysisResult[] {
@@ -201,7 +131,7 @@ export function analyzeScanResults(
       ? analyzeAllVsAllScanResults(scanResults)
       : analyzePrimaryVsAllScanResults(scanResults, primaryPair)
 
-  return applyProbabilityScoring(analyzed, interval, scanMode, primaryPair)
+  return rescoreByProbability(analyzed, interval, scanMode, primaryPair)
 }
 
 /**

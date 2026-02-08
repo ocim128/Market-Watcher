@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { performMtfScan } from '@/lib/analysis/mtf-helpers'
 import type { ConfluenceResult } from '@/lib/analysis/multi-timeframe'
-import { config } from '@/config'
+import { config, type ScanMode } from '@/config'
 
 interface MultiTimeframeProgress {
   currentPair: number
@@ -32,6 +32,7 @@ interface MultiTimeframeScanOptions {
   intervals?: string[]
   totalBars?: number
   primaryPair?: string
+  scanMode?: ScanMode
   concurrency?: number
 }
 
@@ -63,23 +64,33 @@ export function useMultiTimeframe(): UseMultiTimeframeReturn {
         intervals: DEFAULT_INTERVALS,
         totalBars: 200,
         primaryPair: config.primaryPair,
+        scanMode: config.scanMode,
         concurrency: 5,
         ...options,
       }
-      setProgress(p => ({ ...p, status: 'scanning', currentSymbol: 'Starting...' }))
+      setProgress(p => ({
+        ...p,
+        status: 'scanning',
+        currentSymbol: 'Starting...',
+        currentPair: 0,
+        totalPairs: 0,
+        completedIntervals: 0,
+        totalIntervals: 0,
+      }))
       setResults([])
 
       try {
         const confluenceResults = await performMtfScan(
           opts,
           queryClient,
-          (completedCount, currentSymbol) => {
+          (completedCount, currentSymbol, totalSymbols) => {
             setProgress(p => ({
               ...p,
               currentPair: completedCount,
+              totalPairs: totalSymbols,
               currentSymbol,
               completedIntervals: completedCount * opts.intervals.length,
-              totalPairs: completedCount > p.totalPairs ? completedCount : p.totalPairs,
+              totalIntervals: totalSymbols * opts.intervals.length,
             }))
           }
         )

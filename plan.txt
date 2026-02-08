@@ -1,0 +1,215 @@
+Momentum RSI Scanner for Crypto
+A new feature for Market-Watcher that identifies high-momentum crypto pairs experiencing RSI oversold conditions, inspired by the strategy in
+idea.txt
+.
+
+Strategy Summary
+Component	Details
+Universe	Top 100-200 crypto pairs by volume, filtered by 3/6/12 month performance
+Entry Signal	RSI(14) crosses below 30 on 1-hour timeframe
+Exit	3% take profit OR 10 trading days max hold
+Target Win Rate	80%+ (due to momentum filter + small TP)
+Phase 1: Data Infrastructure
+Goal: Store and manage millions of historical candles efficiently
+
+[NEW]
+candle-store.ts
+IndexedDB-based storage for historical candles:
+
+saveCandles(symbol, interval, candles) - bulk insert
+getCandles(symbol, interval, startTime?, endTime?) - query range
+getLatestTimestamp(symbol, interval) - for incremental updates
+clearSymbol(symbol) - cleanup
+[NEW]
+candle-downloader.ts
+Bulk download service leveraging existing Binance client:
+
+downloadFullHistory(symbol, interval, months) - fetch up to 12 months
+updateCandles(symbol, interval) - incremental update from last timestamp
+downloadUniverse(symbols[], interval) - parallel download with rate limiting
+Data Requirements
+Per pair: ~8,760 hourly candles for 12 months (~500KB)
+200 pairs: ~100MB total storage
+Storage: IndexedDB with ~200MB quota (browser limit is typically 50% of disk)
+Phase 2: Universe Builder
+Goal: Identify high-momentum crypto pairs
+
+[NEW]
+universe-builder.ts
+Momentum ranking engine:
+
+typescript
+interface UniverseEntry {
+  symbol: string;
+  perf3m: number;     // 3-month performance %
+  perf6m: number;     // 6-month performance %
+  perf12m: number;    // 12-month performance %
+  criteriasMet: number; // 1, 2, or 3
+  rank: number;
+  volume24h: number;
+}
+Ranking Logic:
+
+Fetch top 200 USDT pairs by 24h volume (existing
+getTopUsdtPairs
+)
+Calculate performance:
+(currentPrice - priceNMonthsAgo) / priceNMonthsAgo * 100
+Filter: >= 25% (3m), >= 45% (6m), >= 75% (12m) — must meet at least 1
+Rank by: criteriasMet DESC, then sum of performances DESC
+[NEW]
+use-universe.ts
+React hook for universe state management:
+
+Load/save universe to localStorage
+Auto-refresh every 2 weeks
+Manual refresh trigger
+Phase 3: RSI Scanner Engine
+Goal: Detect RSI oversold events and generate signals
+
+[NEW]
+rsi-calculator.ts
+Efficient RSI calculation:
+
+typescript
+function calculateRSI(closes: number[], period: number = 14): number[]
+function detectRSICrossover(rsiValues: number[], threshold: number = 30): CrossoverEvent[]
+[NEW]
+signal-generator.ts
+Signal detection and rating:
+
+typescript
+interface Signal {
+  symbol: string;
+  timestamp: number;
+  rsi: number;
+  price: number;
+  rating: number;        // 0-100 composite score
+  meanReversionDist: number;
+  volume24hRank: number;
+  momentum3m: number;
+}
+function scanForSignals(universe: UniverseEntry[], candleStore: CandleStore): Signal[]
+function rateSignal(signal: Signal, marketContext: MarketContext): number
+Rating Components:
+
+Mean reversion distance (how far below average)
+24h volume rank (higher volume = better)
+Momentum score (from universe)
+RSI depth (lower RSI = stronger signal)
+Phase 4: UI Components
+Goal: User interface for the scanner
+
+[NEW]
+scanner-panel.tsx
+Main dashboard component:
+
+Universe status (pairs count, last updated)
+Active alerts table with rating
+Quick actions (scan now, refresh universe)
+[NEW]
+universe-manager.tsx
+Universe configuration:
+
+Performance threshold sliders
+Pair count limit
+Exclusion list
+[NEW]
+signal-history.tsx
+Historical signals tracking:
+
+All past signals with outcomes
+Win/loss tracking for 3% TP / 10-day rule
+Performance statistics
+Navigation Integration
+Add new tab to navigation:
+
+Modify
+navigation/tabs.tsx
+ to include "Scanner" tab
+Phase 5: Backtesting Integration
+Goal: Historical performance validation
+
+[MODIFY]
+backtest-engine.ts
+Add RSI momentum strategy mode:
+
+Entry: RSI < 30 crossover
+Exit: 3% TP or 10 bars (configurable)
+Track win rate and avg hold time
+[NEW]
+scanner-backtest.ts
+Specialized backtest for momentum strategy:
+
+Run backtest across entire universe
+Aggregate statistics
+Monthly/yearly performance breakdown
+Implementation Order & Dependencies
+Phase 1: Data Infrastructure
+Phase 2: Universe Builder
+Phase 3: RSI Scanner
+Phase 4: UI Components
+Phase 5: Backtesting
+Recommended order: 1 → 2 → 3 → 4 → 5 (linear with some parallelism possible between 2 and 3)
+
+Existing Assets to Leverage
+Asset	Location	Usage
+Binance client
+src/lib/binance/client.ts
+getTopUsdtPairs
+,
+fetchKlinesPaged
+,
+fetchMultipleKlines
+Mean reversion
+src/lib/analysis/mean-reversion.ts
+Distance calculation for signal rating
+Backtest engine
+src/lib/analysis/backtest-engine.ts
+Base for strategy backtesting
+Statistics
+src/lib/analysis/statistics.ts
+Statistical calculations
+Verification Plan
+Unit Tests
+Each new module should have tests:
+
+candle-store.test.ts - IndexedDB operations (mock)
+rsi-calculator.test.ts - RSI calculation accuracy
+universe-builder.test.ts - Ranking algorithm
+signal-generator.test.ts - Signal detection and rating
+Run command: npm run test (uses Vitest based on
+vitest.config.ts
+)
+
+Integration Testing
+Download 5 symbols × 1 month of data
+Build mini-universe
+Generate test signals
+Verify backtest results
+Manual Verification
+Start dev server: npm run dev
+Navigate to new Scanner tab
+Initiate universe build (should take 2-5 minutes for 100 pairs)
+Verify signals appear when RSI < 30 conditions exist
+Check backtest results match expected win rate (~80%)
+Estimated Effort
+Phase	Effort	Files
+Phase 1	2-3 hours	2 new files
+Phase 2	2-3 hours	2 new files
+Phase 3	3-4 hours	2 new files
+Phase 4	4-5 hours	3-4 new files
+Phase 5	2-3 hours	1 new + 1 modified
+Total	13-18 hours	10-12 files
+User Review Required
+IMPORTANT
+
+Performance Thresholds: The current plan uses 25%/45%/75% for 3/6/12 month performance (from idea.txt). Crypto is more volatile than stocks - should we adjust these thresholds higher (e.g., 50%/100%/200%)?
+
+IMPORTANT
+
+RSI Timeframe: The strategy uses 1-hour RSI. For 24/7 crypto markets, should we also consider 4-hour or daily RSI options?
+
+IMPORTANT
+
+Data Storage: IndexedDB has browser limits (~50% of disk). For very large universes, should we consider a backend/API approach instead?
