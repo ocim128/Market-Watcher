@@ -17,6 +17,7 @@ import {
   calculateReturns,
   alignSeries,
 } from './statistics'
+import { runScannerBacktestForCandles } from '@/lib/scanner/scanner-backtest'
 import type {
   BacktestConfig,
   BacktestResult,
@@ -25,6 +26,8 @@ import type {
   ExitReason,
   BacktestSummary,
 } from '@/types/backtest-types'
+import type { BinanceKline } from '@/types'
+import type { MomentumBacktestConfig, ScannerBacktestResult } from '@/lib/scanner/types'
 import { DEFAULT_BACKTEST_CONFIG, createEmptyBacktestResult } from '@/types/backtest-types'
 
 // Lookback window for rolling Z-score calculations
@@ -373,5 +376,39 @@ export function runBacktestAllPairs(
 ): BacktestResult[] {
   return pairsData.map(pair =>
     runBacktest(primaryCloses, pair.closes, pair.symbol, primarySymbol, config)
+  )
+}
+
+export type BacktestStrategyMode = 'pair_spread' | 'momentum_rsi'
+
+interface PairSpreadBacktestInput {
+  mode?: 'pair_spread'
+  primaryCloses: number[]
+  secondaryCloses: number[]
+  symbol: string
+  primarySymbol: string
+  config?: Partial<BacktestConfig>
+}
+
+interface MomentumRsiBacktestInput {
+  mode: 'momentum_rsi'
+  symbol: string
+  candles: BinanceKline[]
+  config?: Partial<MomentumBacktestConfig>
+}
+
+export function runBacktestByMode(
+  input: PairSpreadBacktestInput | MomentumRsiBacktestInput
+): BacktestResult | ScannerBacktestResult {
+  if (input.mode === 'momentum_rsi') {
+    return runScannerBacktestForCandles(input.symbol, input.candles, input.config)
+  }
+
+  return runBacktest(
+    input.primaryCloses,
+    input.secondaryCloses,
+    input.symbol,
+    input.primarySymbol,
+    input.config
   )
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Layers, History, Settings, Menu, X, Moon, Sun } from 'lucide-react'
+import { LayoutDashboard, Layers, History, Settings, Menu, X, Moon, Sun, Radar } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/scanner', label: 'Scanner', icon: Radar },
   { href: '/mtf', label: 'Multi-Timeframe', icon: Layers },
   { href: '/history', label: 'History', icon: History },
 ]

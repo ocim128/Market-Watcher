@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Layers, History, ArrowRight, Zap } from 'lucide-react'
+import { Layers, History, ArrowRight, Zap, Radar } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
@@ -70,7 +70,15 @@ function QuickAccessCard({
 
 export function QuickAccess() {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-3">
+      <QuickAccessCard
+        title="Momentum Scanner"
+        description="Find high-momentum pairs with RSI oversold cross alerts and local candle persistence"
+        href="/scanner"
+        icon={Radar}
+        color="amber"
+        stats="JSON/CSV import-export"
+      />
       <QuickAccessCard
         title="Multi-Timeframe Confluence"
         description="Analyze correlations across multiple timeframes for high-confidence signals"
